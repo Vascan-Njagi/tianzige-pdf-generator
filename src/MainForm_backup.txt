@@ -1,0 +1,949 @@
+using System.Drawing;
+using System.Windows.Forms;
+using TianzigeGenerator.Controls;
+using TianzigeGenerator.Models;
+using TianzigeGenerator.Services;
+
+namespace TianzigeGenerator;
+
+public partial class MainForm : Form
+{
+    private Project _project = null!;
+    private int _selectedPageIndex = -1;
+    private bool _updatingControls = false;
+
+    // UI Controls
+    private ListBox _pageList = null!;
+    private GridPreviewControl _preview = null!;
+    private Panel _settingsPanel = null!;
+    private ComboBox _cboPageType = null!;
+    private ComboBox _cboPageSize = null!;
+    private NumericUpDown _nudCellSize = null!;
+    private NumericUpDown _nudCellSpacing = null!;
+    private NumericUpDown _nudLineSpacing = null!;
+    private NumericUpDown _nudColSpacing = null!;
+    private NumericUpDown _nudMarginTop = null!;
+    private NumericUpDown _nudMarginBottom = null!;
+    private NumericUpDown _nudMarginLeft = null!;
+    private NumericUpDown _nudMarginRight = null!;
+    private CheckBox _chkDashed = null!;
+    private CheckBox _chkDotted = null!;
+    private CheckBox _chkDiagonals = null!;
+    private Button _btnBorderColor = null!;
+    private Button _btnGuideColor = null!;
+    private NumericUpDown _nudBorderWidth = null!;
+    private NumericUpDown _nudGuideWidth = null!;
+    private TextBox _txtTitle = null!;
+    private TextBox _txtSubtitle = null!;
+    private TextBox _txtAuthor = null!;
+    private TextBox _txtNotes = null!;
+    private Panel _pageTypePanel = null!;
+    private Panel _coverPanel = null!;
+    private Panel _gridPanel = null!;
+    private Panel _linedPanel = null!;
+    private NumericUpDown _nudLineHeight = null!;
+    private Button _btnLineColor = null!;
+    private CheckBox _chkLandscape = null!;
+    private Label _lblStatus = null!;
+    private FlowLayoutPanel _settingsFlow = null!;
+    private Label _lblPageCount = null!;
+    private Button _btnDuplicatePage = null!;
+    private Button _btnApplyToAll = null!;
+    private Button _btnResetDefaults = null!;
+    private Button _btnCellBgColor = null!;
+    private Button _btnPageBgColor = null!;
+    private NumericUpDown _nudTitleFontSize = null!;
+    private NumericUpDown _nudSubtitleFontSize = null!;
+    private NumericUpDown _nudAuthorFontSize = null!;
+    private NumericUpDown _nudNotesFontSize = null!;
+    private NumericUpDown _nudLineWidth = null!;
+    private CheckBox _chkShowMarginLine = null!;
+    private NumericUpDown _nudCornerRadius = null!;
+    private NumericUpDown _nudInnerPadding = null!;
+    private CheckBox _chkCellShading = null!;
+    private Button _btnCellShadingColor = null!;
+    private TextBox _txtColumnHeaders = null!;
+    private TextBox _txtPageLabel = null!;
+    private NumericUpDown _nudGridRows = null!;
+    private NumericUpDown _nudGridCols = null!;
+
+    public MainForm()
+    {
+        InitializeComponent();
+        _project = Project.CreateDefault();
+        this.KeyPreview = true;
+        this.KeyDown += MainForm_KeyDown;
+        RefreshPageList();
+        if (_pageList.Items.Count > 0)
+        {
+            _pageList.SelectedIndex = 0;
+        }
+    }
+
+    private void MainForm_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Control)
+        {
+            switch (e.KeyCode)
+            {
+                case Keys.N:
+                    BtnNew_Click(null, EventArgs.Empty);
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    break;
+                case Keys.S:
+                    BtnSave_Click(null, EventArgs.Empty);
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    break;
+                case Keys.O:
+                    BtnLoad_Click(null, EventArgs.Empty);
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    break;
+                case Keys.P:
+                    BtnGenerate_Click(null, EventArgs.Empty);
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    break;
+                case Keys.D:
+                    BtnDuplicate_Click(null, EventArgs.Empty);
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    break;
+                case Keys.T:
+                    BtnAdd_Click(null, EventArgs.Empty);
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    break;
+                case Keys.Up:
+                    BtnMoveUp_Click(null, EventArgs.Empty);
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    break;
+                case Keys.Down:
+                    BtnMoveDown_Click(null, EventArgs.Empty);
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    break;
+            }
+        }
+        else if (e.KeyCode == Keys.Delete)
+        {
+            BtnRemove_Click(null, EventArgs.Empty);
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+        }
+    }
+
+    private void InitializeComponent()
+    {
+        this.Text = "田字格生成器 - Tianzige PDF Generator";
+        this.Size = new Size(1600, 950);
+        this.StartPosition = FormStartPosition.CenterScreen;
+        this.MinimumSize = new Size(1400, 850);
+        this.Font = new Font("Segoe UI", 9F);
+        this.BackColor = Color.FromArgb(240, 240, 245);
+
+        // Main vertical layout container
+        var mainLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(0),
+            Margin = new Padding(0)
+        };
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60)); // Top bar
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // Main content
+        this.Controls.Add(mainLayout);
+
+        // ===== TOP BAR =====
+        var topBar = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.FromArgb(50, 50, 70),
+            Margin = new Padding(0),
+            Padding = new Padding(20, 0, 20, 0)
+        };
+        
+        var titleLabel = new Label
+        {
+            Text = "📝 Tianzige PDF Generator",
+            Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+            ForeColor = Color.White,
+            Dock = DockStyle.Left,
+            AutoSize = true,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        topBar.Controls.Add(titleLabel);
+        
+        var subtitleLabel = new Label
+        {
+            Text = "Create beautiful Chinese calligraphy grids",
+            Font = new Font("Segoe UI", 9F, FontStyle.Italic),
+            ForeColor = Color.FromArgb(180, 180, 200),
+            Dock = DockStyle.Left,
+            AutoSize = true,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(20, 0, 0, 0)
+        };
+        topBar.Controls.Add(subtitleLabel);
+        
+        mainLayout.Controls.Add(topBar, 0, 0);
+
+        // ===== MAIN CONTENT AREA (3 columns) =====
+        var contentLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 3,
+            RowCount = 1,
+            Margin = new Padding(10),
+            CellBorderStyle = TableLayoutPanelCellBorderStyle.None
+        };
+        contentLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 380)); // Settings
+        contentLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); // Preview
+        contentLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 320)); // Page list
+        mainLayout.Controls.Add(contentLayout, 0, 1);
+
+        // ===== LEFT PANEL: SETTINGS =====
+        var settingsContainer = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.White,
+            Margin = new Padding(0),
+            Padding = new Padding(0)
+        };
+        
+        // Settings header
+        var settingsHeader = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 40,
+            BackColor = Color.FromArgb(70, 130, 180),
+            Padding = new Padding(15, 0, 0, 0)
+        };
+        var settingsTitle = new Label
+        {
+            Text = "⚙️ Page Settings",
+            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+            ForeColor = Color.White,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        settingsHeader.Controls.Add(settingsTitle);
+        settingsContainer.Controls.Add(settingsHeader);
+        
+        // Settings content
+        _settingsPanel = CreateSettingsPanel();
+        _settingsPanel.Dock = DockStyle.Fill;
+        settingsContainer.Controls.Add(_settingsPanel);
+        
+        contentLayout.Controls.Add(settingsContainer, 0, 0);
+
+        // ===== CENTER PANEL: PREVIEW =====
+        var previewContainer = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.FromArgb(230, 230, 240),
+            Margin = new Padding(0),
+            Padding = new Padding(0)
+        };
+        
+        // Preview header
+        var previewHeader = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 40,
+            BackColor = Color.FromArgb(100, 150, 200),
+            Padding = new Padding(15, 0, 0, 0)
+        };
+        var previewTitle = new Label
+        {
+            Text = "👁️ Live Preview",
+            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+            ForeColor = Color.White,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        previewHeader.Controls.Add(previewTitle);
+        previewContainer.Controls.Add(previewHeader);
+        
+        // Preview content with inner padding
+        var previewInner = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.FromArgb(230, 230, 240),
+            Padding = new Padding(20)
+        };
+        _preview = new GridPreviewControl { Dock = DockStyle.Fill };
+        previewInner.Controls.Add(_preview);
+        previewContainer.Controls.Add(previewInner);
+        
+        contentLayout.Controls.Add(previewContainer, 1, 0);
+
+        // ===== RIGHT PANEL: PAGE LIST =====
+        var pageListContainer = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.White,
+            Margin = new Padding(0),
+            Padding = new Padding(0)
+        };
+        
+        // Page list with border
+        var pageListPanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.White,
+            Padding = new Padding(10)
+        };
+        
+        // Draw border
+        pageListPanel.Paint += (s, e) =>
+        {
+            using var pen = new Pen(Color.FromArgb(180, 180, 200), 1);
+            var rect = pageListPanel.ClientRectangle;
+            rect.Inflate(-1, -1);
+            e.Graphics.DrawRectangle(pen, rect);
+        };
+        
+        _pageList = new ListBox
+        {
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 10F),
+            BorderStyle = BorderStyle.None,
+            IntegralHeight = false,
+            BackColor = Color.White
+        };
+        _pageList.SelectedIndexChanged += PageList_SelectedIndexChanged;
+        pageListPanel.Controls.Add(_pageList);
+        
+        pageListContainer.Controls.Add(pageListPanel);
+        
+        // Page list header with toolbar
+        var pageListHeader = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 90,
+            BackColor = Color.FromArgb(80, 140, 190),
+            Padding = new Padding(10, 8, 10, 8)
+        };
+        
+        var pagesTitle = new Label
+        {
+            Text = "📄 Pages",
+            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+            ForeColor = Color.White,
+            Dock = DockStyle.Top,
+            Height = 25,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        pageListHeader.Controls.Add(pagesTitle);
+        
+        // Page counter
+        _lblPageCount = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 20,
+            Text = "0 pages",
+            TextAlign = ContentAlignment.MiddleCenter,
+            ForeColor = Color.FromArgb(220, 220, 240),
+            Font = new Font("Segoe UI", 8.5F, FontStyle.Italic),
+            BackColor = Color.FromArgb(80, 140, 190)
+        };
+        pageListHeader.Controls.Add(_lblPageCount);
+        
+        // Toolbar buttons
+        var toolbar = CreateToolbar();
+        toolbar.Dock = DockStyle.Top;
+        toolbar.AutoSize = true;
+        pageListHeader.Controls.Add(toolbar);
+        
+        pageListContainer.Controls.Add(pageListHeader);
+        
+        contentLayout.Controls.Add(pageListContainer, 2, 0);
+
+        // ===== STATUS BAR =====
+        _lblStatus = new Label
+        {
+            Dock = DockStyle.Bottom,
+            Height = 28,
+            BackColor = Color.FromArgb(60, 60, 80),
+            ForeColor = Color.White,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(15, 0, 0, 0),
+            Font = new Font("Segoe UI", 9F),
+            Text = "Ready"
+        };
+        this.Controls.Add(_lblStatus);
+    }
+
+    private ToolStrip CreateToolbar()
+    {
+        var toolbar = new ToolStrip
+        {
+            Dock = DockStyle.Top,
+            GripStyle = ToolStripGripStyle.Hidden,
+            Renderer = new ToolStripProfessionalRenderer(new CustomColorTable())
+        };
+
+        var btnAdd = new ToolStripButton("➕ Add Page") { ForeColor = Color.FromArgb(60, 60, 80) };
+        btnAdd.Click += BtnAdd_Click;
+
+        var btnDuplicate = new ToolStripButton("📋 Duplicate") { ForeColor = Color.FromArgb(60, 60, 80) };
+        btnDuplicate.Click += BtnDuplicate_Click;
+
+        var btnRemove = new ToolStripButton("❌ Remove") { ForeColor = Color.FromArgb(180, 60, 60) };
+        btnRemove.Click += BtnRemove_Click;
+
+        var btnMoveUp = new ToolStripButton("⬆") { ForeColor = Color.FromArgb(60, 60, 80) };
+        btnMoveUp.Click += BtnMoveUp_Click;
+
+        var btnMoveDown = new ToolStripButton("⬇") { ForeColor = Color.FromArgb(60, 60, 80) };
+        btnMoveDown.Click += BtnMoveDown_Click;
+
+        var sep1 = new ToolStripSeparator();
+
+        var btnSave = new ToolStripButton("💾 Save Project") { ForeColor = Color.FromArgb(60, 60, 80) };
+        btnSave.Click += BtnSave_Click;
+
+        var btnLoad = new ToolStripButton("📂 Load Project") { ForeColor = Color.FromArgb(60, 60, 80) };
+        btnLoad.Click += BtnLoad_Click;
+
+        var sep2 = new ToolStripSeparator();
+
+        var btnGenerate = new ToolStripButton("📄 Generate PDF") { ForeColor = Color.FromArgb(40, 120, 60), Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+        btnGenerate.Click += BtnGenerate_Click;
+
+        toolbar.Items.AddRange(new ToolStripItem[] { btnAdd, btnDuplicate, btnRemove, btnMoveUp, btnMoveDown, sep1, btnSave, btnLoad, sep2, btnGenerate });
+        return toolbar;
+    }
+
+    private Panel CreateSettingsPanel()
+    {
+        var panel = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.White, Padding = new Padding(15) };
+        var flow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+
+        var lblTitle = new Label { Text = "⚙️ Page Settings", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(60, 60, 80), AutoSize = true, Padding = new Padding(0, 0, 0, 10) };
+        flow.Controls.Add(lblTitle);
+
+        flow.Controls.Add(CreateLabeledCombo("Page Type:", out _cboPageType, new[] { "Cover", "Tianzige Grid (田字格)", "Mizige Grid (米字格)", "Jiugongge Grid (九宫格)", "Lined", "Blank", "Ending" }));
+        _cboPageType.SelectedIndexChanged += (s, e) => OnSettingsChanged();
+
+        flow.Controls.Add(CreateLabeledCombo("Page Size:", out _cboPageSize, PageSizeInfo.All.Select(p => p.Name).ToArray()));
+        _cboPageSize.SelectedIndexChanged += (s, e) => OnPageSizeChanged();
+
+        _chkLandscape = new CheckBox { Text = "Landscape", AutoSize = true, Padding = new Padding(5, 5, 0, 5) };
+        _chkLandscape.CheckedChanged += (s, e) => OnSettingsChanged();
+        flow.Controls.Add(_chkLandscape);
+
+        flow.Controls.Add(new Label { Text = "Margins (mm):", Font = new Font("Segoe UI", 9F, FontStyle.Bold), AutoSize = true, Padding = new Padding(0, 10, 0, 5) });
+        var marginPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        marginPanel.Controls.Add(CreateLabeledNud("Top:", out _nudMarginTop, 0, 100, 15, 1));
+        marginPanel.Controls.Add(CreateLabeledNud("Bottom:", out _nudMarginBottom, 0, 100, 15, 1));
+        marginPanel.Controls.Add(CreateLabeledNud("Left:", out _nudMarginLeft, 0, 100, 15, 1));
+        marginPanel.Controls.Add(CreateLabeledNud("Right:", out _nudMarginRight, 0, 100, 15, 1));
+        foreach (NumericUpDown nud in new[] { _nudMarginTop, _nudMarginBottom, _nudMarginLeft, _nudMarginRight })
+            nud.ValueChanged += (s, e) => OnSettingsChanged();
+        flow.Controls.Add(marginPanel);
+
+        _gridPanel = new Panel { AutoSize = true, Padding = new Padding(0, 10, 0, 0) };
+        var gridFlow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+        gridFlow.Controls.Add(new Label { Text = "Grid Settings:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), AutoSize = true });
+        var gridSettings = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        gridSettings.Controls.Add(CreateLabeledNud("Cell Size (mm):", out _nudCellSize, 5, 100, 15, 1));
+        gridSettings.Controls.Add(CreateLabeledNud("Cell Spacing:", out _nudCellSpacing, 0, 50, 0, 0.5m));
+        gridSettings.Controls.Add(CreateLabeledNud("Row Spacing:", out _nudLineSpacing, 0, 50, 8, 0.5m));
+        gridSettings.Controls.Add(CreateLabeledNud("Col Spacing:", out _nudColSpacing, 0, 50, 8, 0.5m));
+        foreach (NumericUpDown nud in new[] { _nudCellSize, _nudCellSpacing, _nudLineSpacing, _nudColSpacing })
+            nud.ValueChanged += (s, e) => OnSettingsChanged();
+        gridFlow.Controls.Add(gridSettings);
+
+        // Style options
+        var stylePanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 10, 0, 0) };
+        _chkDashed = new CheckBox { Text = "Dashed Guide Lines", AutoSize = true, Checked = true, Padding = new Padding(5, 5, 10, 5) };
+        _chkDashed.CheckedChanged += (s, e) => OnSettingsChanged();
+        _chkDotted = new CheckBox { Text = "Dotted Guide Lines", AutoSize = true, Checked = false, Padding = new Padding(5, 5, 10, 5) };
+        _chkDotted.CheckedChanged += (s, e) => OnSettingsChanged();
+        _chkDiagonals = new CheckBox { Text = "Diagonal Lines (米)", AutoSize = true, Padding = new Padding(5, 5, 10, 5) };
+        _chkDiagonals.CheckedChanged += (s, e) => OnSettingsChanged();
+        stylePanel.Controls.Add(_chkDashed);
+        stylePanel.Controls.Add(_chkDotted);
+        stylePanel.Controls.Add(_chkDiagonals);
+        gridFlow.Controls.Add(stylePanel);
+
+        var colorPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
+        colorPanel.Controls.Add(CreateColorButton("Border:", out _btnBorderColor, Color.FromArgb(40, 40, 40)));
+        colorPanel.Controls.Add(CreateLabeledNud("W:", out _nudBorderWidth, 0.1m, 5, 1.5m, 0.1m));
+        colorPanel.Controls.Add(CreateColorButton("Guide:", out _btnGuideColor, Color.FromArgb(180, 60, 60)));
+        colorPanel.Controls.Add(CreateLabeledNud("W:", out _nudGuideWidth, 0.1m, 3, 0.6m, 0.1m));
+        _nudBorderWidth.ValueChanged += (s, e) => OnSettingsChanged();
+        _nudGuideWidth.ValueChanged += (s, e) => OnSettingsChanged();
+        gridFlow.Controls.Add(colorPanel);
+
+        // Add new grid controls
+        var advancedGridPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
+        advancedGridPanel.Controls.Add(CreateColorButton("Cell BG:", out _btnCellBgColor, Color.White));
+        advancedGridPanel.Controls.Add(CreateColorButton("Page BG:", out _btnPageBgColor, Color.White));
+        advancedGridPanel.Controls.Add(CreateLabeledNud("Corner:", out _nudCornerRadius, 0, 20, 0, 0.5m));
+        advancedGridPanel.Controls.Add(CreateLabeledNud("Padding:", out _nudInnerPadding, 0, 10, 0, 0.5m));
+        _nudCornerRadius.ValueChanged += (s, e) => OnSettingsChanged();
+        _nudInnerPadding.ValueChanged += (s, e) => OnSettingsChanged();
+        gridFlow.Controls.Add(advancedGridPanel);
+
+        var shadingPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
+        _chkCellShading = new CheckBox { Text = "Cell Shading", AutoSize = true, Padding = new Padding(5, 5, 10, 5) };
+        _chkCellShading.CheckedChanged += (s, e) => OnSettingsChanged();
+        shadingPanel.Controls.Add(_chkCellShading);
+        shadingPanel.Controls.Add(CreateColorButton("Shade:", out _btnCellShadingColor, Color.FromArgb(250, 248, 240)));
+        gridFlow.Controls.Add(shadingPanel);
+
+        var headersPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
+        headersPanel.Controls.Add(CreateLabeledText("Headers:", out _txtColumnHeaders, "", 150));
+        _txtColumnHeaders.TextChanged += (s, e) => OnSettingsChanged();
+        headersPanel.Controls.Add(CreateLabeledNud("Rows:", out _nudGridRows, 0, 50, 0, 1));
+        headersPanel.Controls.Add(CreateLabeledNud("Cols:", out _nudGridCols, 0, 20, 0, 1));
+        _nudGridRows.ValueChanged += (s, e) => OnSettingsChanged();
+        _nudGridCols.ValueChanged += (s, e) => OnSettingsChanged();
+        gridFlow.Controls.Add(headersPanel);
+
+        _gridPanel.Controls.Add(gridFlow);
+        flow.Controls.Add(_gridPanel);
+
+        _linedPanel = new Panel { AutoSize = true, Padding = new Padding(0, 10, 0, 0), Visible = false };
+        var linedFlow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+        linedFlow.Controls.Add(new Label { Text = "Lined Page:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), AutoSize = true });
+        var linedSettings = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        linedSettings.Controls.Add(CreateLabeledNud("Line H (mm):", out _nudLineHeight, 2, 30, 8, 0.5m));
+        linedSettings.Controls.Add(CreateColorButton("Color:", out _btnLineColor, Color.FromArgb(180, 200, 220)));
+        linedSettings.Controls.Add(CreateLabeledNud("Width:", out _nudLineWidth, 0.1m, 3, 0.5m, 0.1m));
+        _nudLineHeight.ValueChanged += (s, e) => OnSettingsChanged();
+        _nudLineWidth.ValueChanged += (s, e) => OnSettingsChanged();
+        linedFlow.Controls.Add(linedSettings);
+        
+        _chkShowMarginLine = new CheckBox { Text = "Show Margin Line", AutoSize = true, Padding = new Padding(5, 5, 10, 5), Checked = true };
+        _chkShowMarginLine.CheckedChanged += (s, e) => OnSettingsChanged();
+        linedFlow.Controls.Add(_chkShowMarginLine);
+        
+        _linedPanel.Controls.Add(linedFlow);
+        flow.Controls.Add(_linedPanel);
+
+        _coverPanel = new Panel { AutoSize = true, Padding = new Padding(0, 10, 0, 0), Visible = false };
+        var coverFlow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+        coverFlow.Controls.Add(new Label { Text = "Cover/Ending:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), AutoSize = true });
+        coverFlow.Controls.Add(CreateLabeledText("Title:", out _txtTitle, "汉字书写练习", 200));
+        coverFlow.Controls.Add(CreateLabeledText("Subtitle:", out _txtSubtitle, "Chinese Writing Practice", 200));
+        coverFlow.Controls.Add(CreateLabeledText("Author:", out _txtAuthor, "", 200));
+        coverFlow.Controls.Add(CreateLabeledText("Notes:", out _txtNotes, "", 200, true));
+        foreach (TextBox txt in new[] { _txtTitle, _txtSubtitle, _txtAuthor, _txtNotes })
+            txt.TextChanged += (s, e) => OnSettingsChanged();
+        
+        // Add font size controls
+        var fontSizePanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
+        fontSizePanel.Controls.Add(new Label { Text = "Font Sizes:", Font = new Font("Segoe UI", 8F, FontStyle.Italic), AutoSize = true, Padding = new Padding(5, 8, 5, 0) });
+        fontSizePanel.Controls.Add(CreateLabeledNud("Title:", out _nudTitleFontSize, 8, 72, 36, 1));
+        fontSizePanel.Controls.Add(CreateLabeledNud("Sub:", out _nudSubtitleFontSize, 6, 36, 14, 1));
+        fontSizePanel.Controls.Add(CreateLabeledNud("Auth:", out _nudAuthorFontSize, 6, 36, 14, 1));
+        fontSizePanel.Controls.Add(CreateLabeledNud("Notes:", out _nudNotesFontSize, 6, 24, 10, 1));
+        foreach (var nud in new[] { _nudTitleFontSize, _nudSubtitleFontSize, _nudAuthorFontSize, _nudNotesFontSize })
+            nud.ValueChanged += (s, e) => OnSettingsChanged();
+        coverFlow.Controls.Add(fontSizePanel);
+        
+        _coverPanel.Controls.Add(coverFlow);
+        flow.Controls.Add(_coverPanel);
+
+        // Add page label and action buttons
+        var pageLabelPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 10, 0, 0) };
+        pageLabelPanel.Controls.Add(new Label { Text = "Page Label:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), AutoSize = true, Padding = new Padding(5, 8, 5, 0) });
+        pageLabelPanel.Controls.Add(CreateLabeledText("Custom Name:", out _txtPageLabel, "", 180));
+        _txtPageLabel.TextChanged += (s, e) => OnSettingsChanged();
+        flow.Controls.Add(pageLabelPanel);
+
+        var actionPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 10, 0, 0) };
+        _btnApplyToAll = new Button { Text = "Apply to All Pages", Width = 120, Height = 28, BackColor = Color.FromArgb(60, 60, 80), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        _btnApplyToAll.FlatAppearance.BorderSize = 0;
+        _btnApplyToAll.Click += BtnApplyToAll_Click;
+        _btnResetDefaults = new Button { Text = "Reset Defaults", Width = 100, Height = 28, BackColor = Color.FromArgb(180, 180, 200), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        _btnResetDefaults.FlatAppearance.BorderSize = 0;
+        _btnResetDefaults.Click += BtnResetDefaults_Click;
+        actionPanel.Controls.Add(_btnApplyToAll);
+        actionPanel.Controls.Add(_btnResetDefaults);
+        flow.Controls.Add(actionPanel);
+
+        _pageTypePanel = new Panel { AutoSize = true };
+        flow.Controls.Add(_pageTypePanel);
+
+        panel.Controls.Add(flow);
+        _settingsFlow = flow;
+        return panel;
+    }
+
+    private Panel CreateLabeledNud(string label, out NumericUpDown nud, decimal min, decimal max, decimal value, decimal increment)
+    {
+        var panel = new Panel { AutoSize = true, Padding = new Padding(5) };
+        var lbl = new Label { Text = label, AutoSize = true, Padding = new Padding(0, 5, 5, 0) };
+        nud = new NumericUpDown { Minimum = min, Maximum = max, Value = value, Increment = increment, Width = 60, DecimalPlaces = increment < 1 ? 1 : 0 };
+        panel.Controls.Add(lbl);
+        panel.Controls.Add(nud);
+        return panel;
+    }
+
+    private Panel CreateLabeledCombo(string label, out ComboBox cbo, string[] items)
+    {
+        var panel = new Panel { AutoSize = true, Padding = new Padding(5) };
+        var lbl = new Label { Text = label, AutoSize = true, Padding = new Padding(0, 5, 5, 0) };
+        cbo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
+        cbo.Items.AddRange(items);
+        if (items.Length > 0) cbo.SelectedIndex = 0;
+        panel.Controls.Add(lbl);
+        panel.Controls.Add(cbo);
+        return panel;
+    }
+
+    private Panel CreateLabeledText(string label, out TextBox txt, string defaultValue, int width, bool multiline = false)
+    {
+        var panel = new Panel { AutoSize = true, Padding = new Padding(5) };
+        var lbl = new Label { Text = label, AutoSize = true, Padding = new Padding(0, 5, 5, 0) };
+        txt = new TextBox { Width = width, Text = defaultValue };
+        if (multiline) { txt.Multiline = true; txt.Height = 60; }
+        panel.Controls.Add(lbl);
+        panel.Controls.Add(txt);
+        return panel;
+    }
+
+    private Panel CreateColorButton(string label, out Button btn, Color initialColor)
+    {
+        var panel = new Panel { AutoSize = true, Padding = new Padding(5) };
+        var lbl = new Label { Text = label, AutoSize = true, Padding = new Padding(0, 5, 5, 0) };
+        var button = new Button { Width = 80, Height = 25, BackColor = initialColor, FlatStyle = FlatStyle.Flat };
+        button.FlatAppearance.BorderColor = Color.Gray;
+        button.Tag = initialColor;
+        button.Click += (s, e) =>
+        {
+            using var dlg = new ColorDialog { Color = (Color)button.Tag! };
+            if (dlg.ShowDialog() == DialogResult.OK)
+            {
+                button.BackColor = dlg.Color;
+                button.Tag = dlg.Color;
+                OnSettingsChanged();
+            }
+        };
+        panel.Controls.Add(lbl);
+        panel.Controls.Add(button);
+        btn = button;
+        return panel;
+    }
+
+    private void RefreshPageList()
+    {
+        _pageList.Items.Clear();
+        for (int i = 0; i < _project.Pages.Count; i++)
+            _pageList.Items.Add($"{i + 1}. {_project.Pages[i].DisplayName}");
+        
+        if (_lblPageCount != null)
+            _lblPageCount.Text = $"{_project.Pages.Count} page{(_project.Pages.Count != 1 ? "s" : "")}";
+    }
+
+    private void PageList_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        _selectedPageIndex = _pageList.SelectedIndex;
+        if (_selectedPageIndex < 0 || _selectedPageIndex >= _project.Pages.Count) { _preview.PageSettings = null; return; }
+        LoadPageToUI(_project.Pages[_selectedPageIndex]);
+    }
+
+    private void LoadPageToUI(PageSettings page)
+    {
+        _updatingControls = true;
+        try
+        {
+            _cboPageType.SelectedIndex = page.Type switch
+            {
+                PageType.Cover => 0, PageType.TianzigeGrid => 1, PageType.MizigeGrid => 2,
+                PageType.JiugonggeGrid => 3, PageType.Lined => 4, PageType.Blank => 5, PageType.Ending => 6, _ => 1
+            };
+            var pageSize = PageSizeInfo.All.FirstOrDefault(p => p.Name == page.PageSizeName);
+            _cboPageSize.SelectedIndex = pageSize != null ? Array.IndexOf(PageSizeInfo.All.ToArray(), pageSize) : 1;
+            _chkLandscape.Checked = page.Landscape;
+            _nudMarginTop.Value = (decimal)page.MarginTopMm;
+            _nudMarginBottom.Value = (decimal)page.MarginBottomMm;
+            _nudMarginLeft.Value = (decimal)page.MarginLeftMm;
+            _nudMarginRight.Value = (decimal)page.MarginRightMm;
+            _nudCellSize.Value = (decimal)page.CellSizeMm;
+            _nudCellSpacing.Value = (decimal)page.CellSpacingMm;
+            _nudLineSpacing.Value = (decimal)page.LineSpacingMm;
+            _nudColSpacing.Value = (decimal)page.ColumnSpacingMm;
+            _chkDashed.Checked = page.Style.DashedGuides;
+            _chkDotted.Checked = page.Style.DottedGuides;
+            _chkDiagonals.Checked = page.Style.DrawDiagonals;
+            _btnBorderColor.BackColor = page.Style.BorderColor;
+            _btnBorderColor.Tag = page.Style.BorderColor;
+            _btnGuideColor.BackColor = page.Style.GuideColor;
+            _btnGuideColor.Tag = page.Style.GuideColor;
+            _nudBorderWidth.Value = (decimal)page.Style.BorderWidthPt;
+            _nudGuideWidth.Value = (decimal)page.Style.GuideWidthPt;
+            _nudLineHeight.Value = (decimal)page.LineHeightMm;
+            _btnLineColor.BackColor = page.LineColor;
+            _btnLineColor.Tag = page.LineColor;
+            _txtTitle.Text = page.Title;
+            _txtSubtitle.Text = page.Subtitle;
+            _txtAuthor.Text = page.AuthorName;
+            _txtNotes.Text = page.Notes;
+            
+            // Load new properties
+            if (_nudTitleFontSize != null) _nudTitleFontSize.Value = (decimal)page.TitleFontSizePt;
+            if (_nudSubtitleFontSize != null) _nudSubtitleFontSize.Value = (decimal)page.SubtitleFontSizePt;
+            if (_nudAuthorFontSize != null) _nudAuthorFontSize.Value = (decimal)page.AuthorFontSizePt;
+            if (_nudNotesFontSize != null) _nudNotesFontSize.Value = (decimal)page.NotesFontSizePt;
+            if (_nudLineWidth != null) _nudLineWidth.Value = (decimal)page.LineWidthPt;
+            if (_chkShowMarginLine != null) _chkShowMarginLine.Checked = page.ShowMarginLine;
+            if (_nudCornerRadius != null) _nudCornerRadius.Value = (decimal)page.Style.CornerRadiusPt;
+            if (_nudInnerPadding != null) _nudInnerPadding.Value = (decimal)page.Style.CellInnerPaddingMm;
+            if (_chkCellShading != null) _chkCellShading.Checked = page.Style.ShowCellShading;
+            if (_btnCellShadingColor != null) { _btnCellShadingColor.BackColor = page.Style.CellShadingColor; _btnCellShadingColor.Tag = page.Style.CellShadingColor; }
+            if (_btnCellBgColor != null) { _btnCellBgColor.BackColor = page.Style.CellBackground; _btnCellBgColor.Tag = page.Style.CellBackground; }
+            if (_btnPageBgColor != null) { _btnPageBgColor.BackColor = page.Style.PageBackground; _btnPageBgColor.Tag = page.Style.PageBackground; }
+            if (_txtColumnHeaders != null) _txtColumnHeaders.Text = page.ColumnHeaders;
+            if (_txtPageLabel != null) _txtPageLabel.Text = page.PageLabel;
+            if (_nudGridRows != null) _nudGridRows.Value = page.GridRowsOverride;
+            if (_nudGridCols != null) _nudGridCols.Value = page.GridColsOverride;
+            
+            UpdatePanelVisibility();
+            _preview.PageSettings = page;
+            _preview.Invalidate();
+        }
+        finally { _updatingControls = false; }
+    }
+
+    private void UpdatePanelVisibility()
+    {
+        var pageType = _cboPageType.SelectedIndex switch
+        {
+            0 => PageType.Cover, 1 => PageType.TianzigeGrid, 2 => PageType.MizigeGrid,
+            3 => PageType.JiugonggeGrid, 4 => PageType.Lined, 5 => PageType.Blank, 6 => PageType.Ending, _ => PageType.TianzigeGrid
+        };
+        _gridPanel.Visible = pageType is PageType.TianzigeGrid or PageType.MizigeGrid or PageType.JiugonggeGrid;
+        _linedPanel.Visible = pageType == PageType.Lined;
+        _coverPanel.Visible = pageType is PageType.Cover or PageType.Ending;
+    }
+
+    private void OnSettingsChanged()
+    {
+        if (_updatingControls || _selectedPageIndex < 0 || _selectedPageIndex >= _project.Pages.Count) return;
+        var page = _project.Pages[_selectedPageIndex];
+        page.Type = _cboPageType.SelectedIndex switch
+        {
+            0 => PageType.Cover, 1 => PageType.TianzigeGrid, 2 => PageType.MizigeGrid,
+            3 => PageType.JiugonggeGrid, 4 => PageType.Lined, 5 => PageType.Blank, 6 => PageType.Ending, _ => PageType.TianzigeGrid
+        };
+        page.Landscape = _chkLandscape.Checked;
+        page.MarginTopMm = (float)_nudMarginTop.Value;
+        page.MarginBottomMm = (float)_nudMarginBottom.Value;
+        page.MarginLeftMm = (float)_nudMarginLeft.Value;
+        page.MarginRightMm = (float)_nudMarginRight.Value;
+        page.CellSizeMm = (float)_nudCellSize.Value;
+        page.CellSpacingMm = (float)_nudCellSpacing.Value;
+        page.LineSpacingMm = (float)_nudLineSpacing.Value;
+        page.ColumnSpacingMm = (float)_nudColSpacing.Value;
+        page.Style.DashedGuides = _chkDashed.Checked;
+        page.Style.DottedGuides = _chkDotted.Checked;
+        page.Style.DrawDiagonals = _chkDiagonals.Checked;
+        page.Style.BorderColor = (Color)_btnBorderColor.Tag!;
+        page.Style.GuideColor = (Color)_btnGuideColor.Tag!;
+        page.Style.BorderWidthPt = (float)_nudBorderWidth.Value;
+        page.Style.GuideWidthPt = (float)_nudGuideWidth.Value;
+        page.LineHeightMm = (float)_nudLineHeight.Value;
+        page.LineColor = (Color)_btnLineColor.Tag!;
+        page.Title = _txtTitle.Text;
+        page.Subtitle = _txtSubtitle.Text;
+        page.AuthorName = _txtAuthor.Text;
+        page.Notes = _txtNotes.Text;
+        
+        // Save new properties
+        if (_nudTitleFontSize != null) page.TitleFontSizePt = (float)_nudTitleFontSize.Value;
+        if (_nudSubtitleFontSize != null) page.SubtitleFontSizePt = (float)_nudSubtitleFontSize.Value;
+        if (_nudAuthorFontSize != null) page.AuthorFontSizePt = (float)_nudAuthorFontSize.Value;
+        if (_nudNotesFontSize != null) page.NotesFontSizePt = (float)_nudNotesFontSize.Value;
+        if (_nudLineWidth != null) page.LineWidthPt = (float)_nudLineWidth.Value;
+        if (_chkShowMarginLine != null) page.ShowMarginLine = _chkShowMarginLine.Checked;
+        if (_nudCornerRadius != null) page.Style.CornerRadiusPt = (float)_nudCornerRadius.Value;
+        if (_nudInnerPadding != null) page.Style.CellInnerPaddingMm = (float)_nudInnerPadding.Value;
+        if (_chkCellShading != null) page.Style.ShowCellShading = _chkCellShading.Checked;
+        if (_btnCellShadingColor != null) page.Style.CellShadingColor = (Color)_btnCellShadingColor.Tag!;
+        if (_btnCellBgColor != null) page.Style.CellBackground = (Color)_btnCellBgColor.Tag!;
+        if (_btnPageBgColor != null) page.Style.PageBackground = (Color)_btnPageBgColor.Tag!;
+        if (_txtColumnHeaders != null) page.ColumnHeaders = _txtColumnHeaders.Text;
+        if (_txtPageLabel != null) page.PageLabel = _txtPageLabel.Text;
+        if (_nudGridRows != null) page.GridRowsOverride = (int)_nudGridRows.Value;
+        if (_nudGridCols != null) page.GridColsOverride = (int)_nudGridCols.Value;
+        
+        UpdatePanelVisibility();
+        RefreshPageList();
+        _pageList.SelectedIndex = _selectedPageIndex;
+        _preview.Invalidate();
+    }
+
+    private void OnPageSizeChanged()
+    {
+        if (_updatingControls || _selectedPageIndex < 0 || _selectedPageIndex >= _project.Pages.Count) return;
+        var page = _project.Pages[_selectedPageIndex];
+        if (_cboPageSize.SelectedIndex >= 0 && _cboPageSize.SelectedIndex < PageSizeInfo.All.Count)
+        {
+            var size = PageSizeInfo.All[_cboPageSize.SelectedIndex];
+            page.PageSizeName = size.Name;
+            page.PageWidthMm = size.WidthMm;
+            page.PageHeightMm = size.HeightMm;
+        }
+        OnSettingsChanged();
+    }
+
+    private void BtnAdd_Click(object? sender, EventArgs e)
+    {
+        _project.Pages.Add(new PageSettings { Type = PageType.TianzigeGrid });
+        RefreshPageList();
+        _pageList.SelectedIndex = _project.Pages.Count - 1;
+        _lblStatus.Text = $"Added page {_project.Pages.Count}";
+    }
+
+    private void BtnDuplicate_Click(object? sender, EventArgs e)
+    {
+        if (_selectedPageIndex < 0) return;
+        _project.Pages.Insert(_selectedPageIndex + 1, _project.Pages[_selectedPageIndex].Clone());
+        RefreshPageList();
+        _pageList.SelectedIndex = _selectedPageIndex + 1;
+    }
+
+    private void BtnRemove_Click(object? sender, EventArgs e)
+    {
+        if (_selectedPageIndex < 0) return;
+        if (MessageBox.Show("Remove this page?", "Confirm", MessageBoxButtons.YesNo) == DialogResult.Yes)
+        {
+            _project.Pages.RemoveAt(_selectedPageIndex);
+            RefreshPageList();
+            if (_project.Pages.Count > 0) _pageList.SelectedIndex = Math.Min(_selectedPageIndex, _project.Pages.Count - 1);
+        }
+    }
+
+    private void BtnMoveUp_Click(object? sender, EventArgs e)
+    {
+        if (_selectedPageIndex <= 0) return;
+        var p = _project.Pages[_selectedPageIndex];
+        _project.Pages.RemoveAt(_selectedPageIndex);
+        _project.Pages.Insert(_selectedPageIndex - 1, p);
+        RefreshPageList();
+        _pageList.SelectedIndex = _selectedPageIndex - 1;
+    }
+
+    private void BtnMoveDown_Click(object? sender, EventArgs e)
+    {
+        if (_selectedPageIndex < 0 || _selectedPageIndex >= _project.Pages.Count - 1) return;
+        var p = _project.Pages[_selectedPageIndex];
+        _project.Pages.RemoveAt(_selectedPageIndex);
+        _project.Pages.Insert(_selectedPageIndex + 1, p);
+        RefreshPageList();
+        _pageList.SelectedIndex = _selectedPageIndex + 1;
+    }
+
+    private void BtnSave_Click(object? sender, EventArgs e)
+    {
+        using var dlg = new SaveFileDialog { Filter = "Tianzige Project (*.tzp)|*.tzp", FileName = _project.Name + ".tzp" };
+        if (dlg.ShowDialog() == DialogResult.OK)
+        {
+            _project.SaveToFile(dlg.FileName);
+            _lblStatus.Text = $"Saved: {dlg.FileName}";
+        }
+    }
+
+    private void BtnLoad_Click(object? sender, EventArgs e)
+    {
+        using var dlg = new OpenFileDialog { Filter = "Tianzige Project (*.tzp)|*.tzp" };
+        if (dlg.ShowDialog() == DialogResult.OK)
+        {
+            try
+            {
+                _project = Project.LoadFromFile(dlg.FileName);
+                RefreshPageList();
+                if (_project.Pages.Count > 0) _pageList.SelectedIndex = 0;
+                _lblStatus.Text = $"Loaded: {dlg.FileName}";
+            }
+            catch (Exception ex) { MessageBox.Show($"Load failed: {ex.Message}"); }
+        }
+    }
+
+    private void BtnGenerate_Click(object? sender, EventArgs e)
+    {
+        if (_project.Pages.Count == 0) { MessageBox.Show("No pages!"); return; }
+        using var dlg = new SaveFileDialog { Filter = "PDF (*.pdf)|*.pdf", FileName = _project.Name + ".pdf" };
+        if (dlg.ShowDialog() == DialogResult.OK)
+        {
+            try
+            {
+                _lblStatus.Text = "Generating...";
+                Cursor = Cursors.WaitCursor;
+                PdfGenerator.Generate(_project, dlg.FileName);
+                Cursor = Cursors.Default;
+                _lblStatus.Text = $"PDF: {dlg.FileName}";
+                if (MessageBox.Show("PDF generated! Open it?", "Success", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = dlg.FileName, UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Cursor = Cursors.Default;
+                MessageBox.Show($"PDF failed: {ex.Message}");
+            }
+        }
+    }
+
+    private void BtnApplyToAll_Click(object? sender, EventArgs e)
+    {
+        if (_selectedPageIndex < 0) return;
+        if (MessageBox.Show("Apply current page settings to all pages?", "Confirm", MessageBoxButtons.YesNo) != DialogResult.Yes)
+            return;
+        
+        var source = _project.Pages[_selectedPageIndex];
+        for (int i = 0; i < _project.Pages.Count; i++)
+        {
+            if (i != _selectedPageIndex && _project.Pages[i].Type == source.Type)
+            {
+                _project.Pages[i] = source.Clone();
+            }
+        }
+        RefreshPageList();
+        _pageList.SelectedIndex = _selectedPageIndex;
+        _lblStatus.Text = "Settings applied to all pages of same type";
+    }
+
+    private void BtnResetDefaults_Click(object? sender, EventArgs e)
+    {
+        if (_selectedPageIndex < 0) return;
+        if (MessageBox.Show("Reset this page to default settings?", "Confirm", MessageBoxButtons.YesNo) != DialogResult.Yes)
+            return;
+        
+        var page = _project.Pages[_selectedPageIndex];
+        var defaults = new PageSettings { Type = page.Type };
+        defaults.Style = new GridStyle();
+        _project.Pages[_selectedPageIndex] = defaults;
+        LoadPageToUI(defaults);
+        _preview.Invalidate();
+        _lblStatus.Text = "Page reset to defaults";
+    }
+
+    private void BtnNew_Click(object? sender, EventArgs e)
+    {
+        if (MessageBox.Show("Create a new project? Unsaved changes will be lost.", "Confirm", MessageBoxButtons.YesNo) == DialogResult.Yes)
+        {
+            _project = Project.CreateDefault();
+            RefreshPageList();
+            if (_pageList.Items.Count > 0)
+                _pageList.SelectedIndex = 0;
+            _lblStatus.Text = "New project created";
+        }
+    }
+}
+
+internal class CustomColorTable : ProfessionalColorTable
+{
+    public override Color ToolStripGradientBegin => Color.FromArgb(250, 250, 255);
+    public override Color ToolStripGradientMiddle => Color.FromArgb(245, 245, 250);
+    public override Color ToolStripGradientEnd => Color.FromArgb(240, 240, 245);
+}
