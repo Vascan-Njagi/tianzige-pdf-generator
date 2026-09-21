@@ -30,13 +30,6 @@ public class GridPreviewControl : Control
         var padding = 20f;
         var rect = new RectangleF(padding, padding, Width - 2 * padding, Height - 2 * padding);
 
-        // Add drop shadow effect
-        using (var shadowBrush = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
-        {
-            var shadowRect = new RectangleF(rect.X + 3, rect.Y + 3, rect.Width, rect.Height);
-            g.FillRectangle(shadowBrush, shadowRect);
-        }
-
         GridRenderer.RenderPage(g, PageSettings, rect);
     }
 

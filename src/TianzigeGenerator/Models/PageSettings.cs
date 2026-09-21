@@ -14,31 +14,33 @@ public class PageSettings
     public float PageHeightMm { get; set; } = 297f;
     public bool Landscape { get; set; } = false;
 
+    // Global settings
+    public bool ShowPageNumbers { get; set; } = false;
+
     // Margins (mm)
     public float MarginTopMm { get; set; } = 15f;
     public float MarginBottomMm { get; set; } = 15f;
     public float MarginLeftMm { get; set; } = 15f;
     public float MarginRightMm { get; set; } = 15f;
 
+    // Elements for WYSIWYG
+    public List<CustomElement> Elements { get; set; } = new();
+
     // Grid cell settings
     public float CellSizeMm { get; set; } = 15f;       // Size of each square cell
     public float CellSpacingMm { get; set; } = 0f;     // Gap between cells
     public float LineSpacingMm { get; set; } = 8f;     // Vertical spacing between rows of cells
     public float ColumnSpacingMm { get; set; } = 8f;   // Horizontal spacing between columns of cells
+    public float PinyinHeightMm { get; set; } = 6f;    // Pinyin box height for Vocabulary pages
 
     // Grid style
     public GridStyle Style { get; set; } = new();
 
-    // Cover / Ending page fields
+    // Standard Fallback Content Fields
     public string Title { get; set; } = "汉字书写练习";
     public string Subtitle { get; set; } = "Chinese Character Writing Practice";
     public string AuthorName { get; set; } = "";
     public string Notes { get; set; } = "";
-
-    // Lined page settings
-    public float LineHeightMm { get; set; } = 8f;
-    public Color LineColor { get; set; } = System.Drawing.Color.FromArgb(180, 200, 220);
-    public float LineWidthPt { get; set; } = 0.5f;
 
     // Cover/Ending page font sizes (in points)
     public float TitleFontSizePt { get; set; } = 36f;
@@ -46,7 +48,12 @@ public class PageSettings
     public float AuthorFontSizePt { get; set; } = 14f;
     public float NotesFontSizePt { get; set; } = 10f;
 
-    // Custom page size (used when PageSizeName is "Custom")
+    // Lined page settings
+    public float LineHeightMm { get; set; } = 8f;
+    public Color LineColor { get; set; } = System.Drawing.Color.FromArgb(180, 200, 220);
+    public float LineWidthPt { get; set; } = 0.5f;
+
+    // Custompage size (used when PageSizeName is "Custom")
     public float CustomWidthMm { get; set; } = 210f;
     public float CustomHeightMm { get; set; } = 297f;
 
@@ -66,13 +73,14 @@ public class PageSettings
     // Display label for page list
     public string DisplayName => !string.IsNullOrEmpty(PageLabel) ? PageLabel : (Type switch
     {
-        PageType.Cover => $"📖 Cover: {Truncate(Title, 20)}",
-        PageType.Ending => $"📕 Ending: {Truncate(Title, 20)}",
         PageType.TianzigeGrid => $"田 {CellSizeMm}mm Tianzige",
         PageType.MizigeGrid => $"米 {CellSizeMm}mm Mizige",
         PageType.JiugonggeGrid => $"九 {CellSizeMm}mm Jiugongge",
+        PageType.EssayGrid => $"作 {CellSizeMm}mm Essay Grid",
+        PageType.Vocabulary => $"字 {CellSizeMm}mm Vocabulary",
         PageType.Blank => "▢ Blank Page",
         PageType.Lined => $"≡ Lined ({LineHeightMm}mm)",
+        PageType.Custom => "📝 Custom Page",
         _ => Type.ToString()
     });
 
@@ -91,6 +99,8 @@ public class PageSettings
             PageWidthMm = PageWidthMm,
             PageHeightMm = PageHeightMm,
             Landscape = Landscape,
+            ShowPageNumbers = ShowPageNumbers,
+            Elements = Elements.Select(e => e.Clone()).ToList(),
             MarginTopMm = MarginTopMm,
             MarginBottomMm = MarginBottomMm,
             MarginLeftMm = MarginLeftMm,
@@ -99,6 +109,7 @@ public class PageSettings
             CellSpacingMm = CellSpacingMm,
             LineSpacingMm = LineSpacingMm,
             ColumnSpacingMm = ColumnSpacingMm,
+            PinyinHeightMm = PinyinHeightMm,
             Style = Style.Clone(),
             Title = Title,
             Subtitle = Subtitle,

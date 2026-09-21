@@ -14,14 +14,6 @@ public class Project
     public static Project CreateDefault()
     {
         var project = new Project { Name = "My Practice Book" };
-        // Add a cover page
-        project.Pages.Add(new PageSettings
-        {
-            Type = PageType.Cover,
-            Title = "汉字书写练习",
-            Subtitle = "Chinese Character Writing Practice",
-            AuthorName = "Student Name"
-        });
         // Add a tianzige grid page
         project.Pages.Add(new PageSettings
         {

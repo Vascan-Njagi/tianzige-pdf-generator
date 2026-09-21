@@ -16,6 +16,7 @@ public partial class MainForm : Form
     private ListBox _pageList = null!;
     private GridPreviewControl _preview = null!;
     private Panel _settingsPanel = null!;
+    private TabControl _settingsTabControl = null!;
     private ComboBox _cboPageType = null!;
     private ComboBox _cboPageSize = null!;
     private NumericUpDown _nudCellSize = null!;
@@ -37,9 +38,12 @@ public partial class MainForm : Form
     private TextBox _txtSubtitle = null!;
     private TextBox _txtAuthor = null!;
     private TextBox _txtNotes = null!;
-    private Panel _pageTypePanel = null!;
     private Panel _coverPanel = null!;
     private Panel _gridPanel = null!;
+    private Button _btnSelectCoverImage = null!;
+    private Button _btnClearCoverImage = null!;
+    private FlowLayoutPanel _customTextFlow = null!;
+    private Button _btnAddCustomText = null!;
     private Panel _linedPanel = null!;
     private NumericUpDown _nudLineHeight = null!;
     private Button _btnLineColor = null!;
@@ -47,7 +51,6 @@ public partial class MainForm : Form
     private Label _lblStatus = null!;
     private FlowLayoutPanel _settingsFlow = null!;
     private Label _lblPageCount = null!;
-    private Button _btnDuplicatePage = null!;
     private Button _btnApplyToAll = null!;
     private Button _btnResetDefaults = null!;
     private Button _btnMultiply = null!;
@@ -193,34 +196,51 @@ public partial class MainForm : Form
         
         mainLayout.Controls.Add(topBar, 0, 0);
 
-        // ===== MAIN CONTENT AREA (3 columns) =====
-        var contentLayout = new TableLayoutPanel
+        // ===== MAIN CONTENT AREA (Resizable Splitters) =====
+        var contentContainer = new Panel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 3,
-            RowCount = 1,
-            Margin = new Padding(10),
-            CellBorderStyle = TableLayoutPanelCellBorderStyle.None
+            Padding = new Padding(10),
+            BackColor = Color.FromArgb(240, 240, 245)
         };
-        contentLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 380)); // Settings
-        contentLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); // Preview
-        contentLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 320)); // Page list
-        mainLayout.Controls.Add(contentLayout, 0, 1);
+
+        var outerSplit = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            SplitterWidth = 8,
+            BackColor = Color.FromArgb(220, 225, 235),
+            FixedPanel = FixedPanel.Panel1
+        };
+
+        var innerSplit = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            SplitterWidth = 8,
+            BackColor = Color.FromArgb(220, 225, 235),
+            FixedPanel = FixedPanel.Panel2
+        };
+
+        mainLayout.Controls.Add(contentContainer, 0, 1);
 
         // ===== LEFT PANEL: SETTINGS =====
-        var settingsContainer = new Panel
+        var settingsContainer = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            BackColor = Color.White,
+            ColumnCount = 1,
+            RowCount = 2,
             Margin = new Padding(0),
-            Padding = new Padding(0)
+            Padding = new Padding(0),
+            BackColor = Color.White
         };
-        
+        settingsContainer.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+        settingsContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
         // Settings header
         var settingsHeader = new Panel
         {
-            Dock = DockStyle.Top,
-            Height = 40,
+            Dock = DockStyle.Fill,
             BackColor = Color.FromArgb(70, 130, 180),
             Padding = new Padding(15, 0, 0, 0)
         };
@@ -233,14 +253,14 @@ public partial class MainForm : Form
             TextAlign = ContentAlignment.MiddleLeft
         };
         settingsHeader.Controls.Add(settingsTitle);
-        settingsContainer.Controls.Add(settingsHeader);
-        
+        settingsContainer.Controls.Add(settingsHeader, 0, 0);
+
         // Settings content
         _settingsPanel = CreateSettingsPanel();
         _settingsPanel.Dock = DockStyle.Fill;
-        settingsContainer.Controls.Add(_settingsPanel);
-        
-        contentLayout.Controls.Add(settingsContainer, 0, 0);
+        settingsContainer.Controls.Add(_settingsPanel, 0, 1);
+
+        outerSplit.Panel1.Controls.Add(settingsContainer);
 
         // ===== CENTER PANEL: PREVIEW =====
         var previewContainer = new Panel
@@ -281,7 +301,7 @@ public partial class MainForm : Form
         previewInner.Controls.Add(_preview);
         previewContainer.Controls.Add(previewInner);
         
-        contentLayout.Controls.Add(previewContainer, 1, 0);
+        innerSplit.Panel1.Controls.Add(previewContainer);
 
         // ===== RIGHT PANEL: PAGE LIST =====
         var pageListContainer = new Panel
@@ -363,7 +383,33 @@ public partial class MainForm : Form
         
         pageListContainer.Controls.Add(pageListHeader);
         
-        contentLayout.Controls.Add(pageListContainer, 2, 0);
+        innerSplit.Panel2.Controls.Add(pageListContainer);
+        outerSplit.Panel2.Controls.Add(innerSplit);
+        contentContainer.Controls.Add(outerSplit);
+
+        this.Load += (s, e) =>
+        {
+            try
+            {
+                outerSplit.Panel1MinSize = 350;
+                outerSplit.Panel2MinSize = 670;
+                if (outerSplit.Width > outerSplit.Panel1MinSize + outerSplit.Panel2MinSize)
+                {
+                    int maxOuter = outerSplit.Width - outerSplit.Panel2MinSize;
+                    outerSplit.SplitterDistance = Math.Clamp(380, outerSplit.Panel1MinSize, Math.Max(outerSplit.Panel1MinSize, maxOuter));
+                }
+
+                innerSplit.Panel1MinSize = 400;
+                innerSplit.Panel2MinSize = 250;
+                if (innerSplit.Width > innerSplit.Panel1MinSize + innerSplit.Panel2MinSize)
+                {
+                    int targetDistance = innerSplit.Width - 320;
+                    int maxInner = innerSplit.Width - innerSplit.Panel2MinSize;
+                    innerSplit.SplitterDistance = Math.Clamp(targetDistance, innerSplit.Panel1MinSize, Math.Max(innerSplit.Panel1MinSize, maxInner));
+                }
+            }
+            catch { /* Ignore initial layout edge cases */ }
+        };
 
         // ===== STATUS BAR =====
         _lblStatus = new Label
@@ -421,84 +467,194 @@ public partial class MainForm : Form
         return toolbar;
     }
 
+    private Panel CreateColorCodedPanel(string title, Color bgColor, Color borderColor, Control innerControl)
+    {
+        var container = new Panel
+        {
+            BackColor = bgColor,
+            MinimumSize = new Size(310, 0),
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0, 0, 0, 10),
+            Padding = new Padding(1)
+        };
+
+        container.Paint += (s, e) =>
+        {
+            using var pen = new Pen(borderColor, 1.5f);
+            e.Graphics.DrawRectangle(pen, 0, 0, container.Width - 1, container.Height - 1);
+        };
+
+        var flow = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false,
+            FlowDirection = FlowDirection.TopDown,
+            Padding = new Padding(8, 6, 8, 8),
+            BackColor = bgColor,
+            MinimumSize = new Size(308, 0)
+        };
+
+        var lblHeader = new Label
+        {
+            Text = title,
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(40, 50, 70),
+            AutoSize = true,
+            Padding = new Padding(0, 0, 0, 6)
+        };
+        flow.Controls.Add(lblHeader);
+        flow.Controls.Add(innerControl);
+
+        container.Controls.Add(flow);
+
+        void UpdateWidth()
+        {
+            if (container.Parent != null && container.Parent.ClientSize.Width > 0)
+            {
+                int targetWidth = container.Parent.ClientSize.Width - container.Margin.Horizontal - container.Parent.Padding.Horizontal - 6;
+                if (targetWidth >= 310)
+                {
+                    container.Width = targetWidth;
+                    flow.Width = targetWidth - container.Padding.Horizontal;
+                }
+            }
+        }
+
+        container.ParentChanged += (s, e) =>
+        {
+            if (container.Parent != null)
+            {
+                container.Parent.SizeChanged += (ps, pe) => UpdateWidth();
+                UpdateWidth();
+            }
+        };
+
+        return container;
+    }
+
     private Panel CreateSettingsPanel()
     {
-        var panel = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.White, Padding = new Padding(15) };
-        var flow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+        var panel = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.White, Padding = new Padding(2) };
 
-        var lblTitle = new Label { Text = "⚙️ Page Settings", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(60, 60, 80), AutoSize = true, Padding = new Padding(0, 0, 0, 10) };
-        flow.Controls.Add(lblTitle);
+        _settingsTabControl = new TabControl { Dock = DockStyle.Fill };
 
-        flow.Controls.Add(CreateLabeledCombo("Page Type:", out _cboPageType, new[] { "Cover", "Tianzige Grid (田字格)", "Mizige Grid (米字格)", "Jiugongge Grid (九宫格)", "Lined", "Blank", "Ending" }));
+        // --- TAB 1: LAYOUT ---
+        var tpLayout = new TabPage("Layout") { AutoScroll = true, Padding = new Padding(8), BackColor = Color.White };
+        var flowLayout = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+
+        // Sub-Panel 1: Page Template & Dimensions (Light Sky Blue)
+        var layoutInner = new FlowLayoutPanel { AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+        layoutInner.Controls.Add(CreateLabeledCombo("Page Type:", out _cboPageType, new[] { "Tianzige Grid (田字格)", "Jiugongge Grid (九宫格)", "Essay Grid (作文格)", "Vocabulary (生字本)", "Lined", "Blank", "Custom" }));
         _cboPageType.SelectedIndexChanged += (s, e) => OnSettingsChanged();
 
-        flow.Controls.Add(CreateLabeledCombo("Page Size:", out _cboPageSize, PageSizeInfo.All.Select(p => p.Name).ToArray()));
+        layoutInner.Controls.Add(CreateLabeledCombo("Page Size:", out _cboPageSize, PageSizeInfo.All.Select(p => p.Name).ToArray()));
         _cboPageSize.SelectedIndexChanged += (s, e) => OnPageSizeChanged();
 
-        _chkLandscape = new CheckBox { Text = "Landscape", AutoSize = true, Padding = new Padding(5, 5, 0, 5) };
+        _chkLandscape = new CheckBox { Text = "Landscape Orientation", AutoSize = true, Padding = new Padding(5, 5, 0, 5) };
         _chkLandscape.CheckedChanged += (s, e) => OnSettingsChanged();
-        flow.Controls.Add(_chkLandscape);
+        layoutInner.Controls.Add(_chkLandscape);
 
-        flow.Controls.Add(new Label { Text = "Margins (mm):", Font = new Font("Segoe UI", 9F, FontStyle.Bold), AutoSize = true, Padding = new Padding(0, 10, 0, 5) });
-        var marginPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
-        marginPanel.Controls.Add(CreateLabeledNud("Top:", out _nudMarginTop, 0, 100, 15, 1));
-        marginPanel.Controls.Add(CreateLabeledNud("Bottom:", out _nudMarginBottom, 0, 100, 15, 1));
-        marginPanel.Controls.Add(CreateLabeledNud("Left:", out _nudMarginLeft, 0, 100, 15, 1));
-        marginPanel.Controls.Add(CreateLabeledNud("Right:", out _nudMarginRight, 0, 100, 15, 1));
+        var pageLabelPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
+        pageLabelPanel.Controls.Add(CreateLabeledText("Page Label:", out _txtPageLabel, "", 180));
+        _txtPageLabel.TextChanged += (s, e) => OnSettingsChanged();
+        layoutInner.Controls.Add(pageLabelPanel);
+
+        flowLayout.Controls.Add(CreateColorCodedPanel("📄 Page Template & Size", Color.FromArgb(235, 243, 252), Color.FromArgb(140, 180, 220), layoutInner));
+
+        // Sub-Panel 2: Margins (mm) (Light Mint Green)
+        var marginInner = new FlowLayoutPanel { AutoSize = true, WrapContents = true, FlowDirection = FlowDirection.LeftToRight };
+        var m1 = CreateLabeledNud("Top:", out _nudMarginTop, 0, 100, 15, 1);
+        var m2 = CreateLabeledNud("Bottom:", out _nudMarginBottom, 0, 100, 15, 1);
+        var m3 = CreateLabeledNud("Left:", out _nudMarginLeft, 0, 100, 15, 1);
+        var m4 = CreateLabeledNud("Right:", out _nudMarginRight, 0, 100, 15, 1);
+
         foreach (NumericUpDown nud in new[] { _nudMarginTop, _nudMarginBottom, _nudMarginLeft, _nudMarginRight })
             nud.ValueChanged += (s, e) => OnSettingsChanged();
-        flow.Controls.Add(marginPanel);
 
-        _gridPanel = new Panel { AutoSize = true, Padding = new Padding(0, 10, 0, 0) };
-        var gridFlow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
-        gridFlow.Controls.Add(new Label { Text = "Grid Settings:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), AutoSize = true });
+        marginInner.Controls.Add(m1);
+        marginInner.Controls.Add(m2);
+        marginInner.Controls.Add(m3);
+        marginInner.Controls.Add(m4);
+
+        void UpdateMarginLayout()
+        {
+            if (marginInner.Parent == null) return;
+            int parentWidth = marginInner.Parent.ClientSize.Width - marginInner.Parent.Padding.Horizontal - marginInner.Margin.Horizontal;
+            if (parentWidth <= 0) return;
+
+            marginInner.Width = parentWidth;
+            int availW = parentWidth - marginInner.Padding.Horizontal - 10;
+
+            if (availW >= 560)
+            {
+                // 4 items on 1 row (~24% each)
+                int itemW = (availW - 18) / 4;
+                m1.Width = itemW; m2.Width = itemW; m3.Width = itemW; m4.Width = itemW;
+            }
+            else if (availW >= 270)
+            {
+                // 2 items per row (~48% each)
+                int itemW = (availW - 10) / 2;
+                m1.Width = itemW; m2.Width = itemW; m3.Width = itemW; m4.Width = itemW;
+            }
+            else
+            {
+                // 1 item per row (100% stacked)
+                m1.Width = availW; m2.Width = availW; m3.Width = availW; m4.Width = availW;
+            }
+        }
+
+        marginInner.SizeChanged += (s, e) => UpdateMarginLayout();
+        marginInner.ParentChanged += (s, e) =>
+        {
+            if (marginInner.Parent != null)
+            {
+                marginInner.Parent.SizeChanged += (ps, pe) => UpdateMarginLayout();
+                UpdateMarginLayout();
+            }
+        };
+
+        flowLayout.Controls.Add(CreateColorCodedPanel("📐 Page Margins (mm)", Color.FromArgb(238, 248, 238), Color.FromArgb(140, 200, 140), marginInner));
+
+        // Sub-Panel 3: Global Actions (Neutral Gray)
+        var actionInner = new FlowLayoutPanel { AutoSize = true, WrapContents = true, FlowDirection = FlowDirection.LeftToRight };
+        _btnApplyToAll = new Button { Text = "Apply to All Pages", Width = 142, Height = 28, BackColor = Color.FromArgb(60, 60, 80), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        _btnApplyToAll.FlatAppearance.BorderSize = 0;
+        _btnApplyToAll.Click += BtnApplyToAll_Click;
+
+        _btnResetDefaults = new Button { Text = "Reset Defaults", Width = 142, Height = 28, BackColor = Color.FromArgb(180, 180, 200), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        _btnResetDefaults.FlatAppearance.BorderSize = 0;
+        _btnResetDefaults.Click += BtnResetDefaults_Click;
+
+        _btnMultiply = new Button { Text = "Multiply Current Page", Width = 288, Height = 28, BackColor = Color.FromArgb(40, 120, 60), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Margin = new Padding(0, 5, 0, 0) };
+        _btnMultiply.FlatAppearance.BorderSize = 0;
+        _btnMultiply.Click += BtnMultiply_Click;
+
+        actionInner.Controls.Add(_btnApplyToAll);
+        actionInner.Controls.Add(_btnResetDefaults);
+        actionInner.Controls.Add(_btnMultiply);
+
+        flowLayout.Controls.Add(CreateColorCodedPanel("⚡ Page Actions", Color.FromArgb(245, 245, 250), Color.FromArgb(180, 180, 200), actionInner));
+
+        tpLayout.Controls.Add(flowLayout);
+
+        // --- TAB 2: GRID / LINES ---
+        var tpGrid = new TabPage("Grid / Lines") { AutoScroll = true, Padding = new Padding(10), BackColor = Color.White };
+        var flowGrid = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+
+        // Sub-Panel 4: Grid Dimensions (Light Warm Amber)
+        var gridFlow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+
         var gridSettings = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
         gridSettings.Controls.Add(CreateLabeledNud("Cell Size (mm):", out _nudCellSize, 5, 100, 15, 1));
-        gridSettings.Controls.Add(CreateLabeledNud("Cell Spacing:", out _nudCellSpacing, 0, 50, 0, 0.5m));
-        gridSettings.Controls.Add(CreateLabeledNud("Row Spacing:", out _nudLineSpacing, 0, 50, 8, 0.5m));
-        gridSettings.Controls.Add(CreateLabeledNud("Col Spacing:", out _nudColSpacing, 0, 50, 8, 0.5m));
+        gridSettings.Controls.Add(CreateLabeledNud("Cell Gap:", out _nudCellSpacing, 0, 50, 0, 0.5m));
+        gridSettings.Controls.Add(CreateLabeledNud("Row Gap:", out _nudLineSpacing, 0, 50, 8, 0.5m));
+        gridSettings.Controls.Add(CreateLabeledNud("Col Gap:", out _nudColSpacing, 0, 50, 8, 0.5m));
         foreach (NumericUpDown nud in new[] { _nudCellSize, _nudCellSpacing, _nudLineSpacing, _nudColSpacing })
             nud.ValueChanged += (s, e) => OnSettingsChanged();
         gridFlow.Controls.Add(gridSettings);
-
-        // Style options
-        var stylePanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 10, 0, 0) };
-        _chkDashed = new CheckBox { Text = "Dashed Guide Lines", AutoSize = true, Checked = true, Padding = new Padding(5, 5, 10, 5) };
-        _chkDashed.CheckedChanged += (s, e) => OnSettingsChanged();
-        _chkDotted = new CheckBox { Text = "Dotted Guide Lines", AutoSize = true, Checked = false, Padding = new Padding(5, 5, 10, 5) };
-        _chkDotted.CheckedChanged += (s, e) => OnSettingsChanged();
-        _chkDiagonals = new CheckBox { Text = "Diagonal Lines (米)", AutoSize = true, Padding = new Padding(5, 5, 10, 5) };
-        _chkDiagonals.CheckedChanged += (s, e) => OnSettingsChanged();
-        stylePanel.Controls.Add(_chkDashed);
-        stylePanel.Controls.Add(_chkDotted);
-        stylePanel.Controls.Add(_chkDiagonals);
-        gridFlow.Controls.Add(stylePanel);
-
-        var colorPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
-        colorPanel.Controls.Add(CreateColorButton("Border:", out _btnBorderColor, Color.FromArgb(40, 40, 40)));
-        colorPanel.Controls.Add(CreateLabeledNud("W:", out _nudBorderWidth, 0.1m, 5, 1.5m, 0.1m));
-        colorPanel.Controls.Add(CreateColorButton("Guide:", out _btnGuideColor, Color.FromArgb(180, 60, 60)));
-        colorPanel.Controls.Add(CreateLabeledNud("W:", out _nudGuideWidth, 0.1m, 3, 0.6m, 0.1m));
-        _nudBorderWidth.ValueChanged += (s, e) => OnSettingsChanged();
-        _nudGuideWidth.ValueChanged += (s, e) => OnSettingsChanged();
-        gridFlow.Controls.Add(colorPanel);
-
-        // Add new grid controls
-        var advancedGridPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
-        advancedGridPanel.Controls.Add(CreateColorButton("Cell BG:", out _btnCellBgColor, Color.White));
-        advancedGridPanel.Controls.Add(CreateColorButton("Page BG:", out _btnPageBgColor, Color.White));
-        advancedGridPanel.Controls.Add(CreateLabeledNud("Corner:", out _nudCornerRadius, 0, 20, 0, 0.5m));
-        advancedGridPanel.Controls.Add(CreateLabeledNud("Padding:", out _nudInnerPadding, 0, 10, 0, 0.5m));
-        _nudCornerRadius.ValueChanged += (s, e) => OnSettingsChanged();
-        _nudInnerPadding.ValueChanged += (s, e) => OnSettingsChanged();
-        gridFlow.Controls.Add(advancedGridPanel);
-
-        var shadingPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
-        _chkCellShading = new CheckBox { Text = "Cell Shading", AutoSize = true, Padding = new Padding(5, 5, 10, 5) };
-        _chkCellShading.CheckedChanged += (s, e) => OnSettingsChanged();
-        shadingPanel.Controls.Add(_chkCellShading);
-        shadingPanel.Controls.Add(CreateColorButton("Shade:", out _btnCellShadingColor, Color.FromArgb(250, 248, 240)));
-        gridFlow.Controls.Add(shadingPanel);
 
         var headersPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
         headersPanel.Controls.Add(CreateLabeledText("Headers:", out _txtColumnHeaders, "", 150));
@@ -509,12 +665,11 @@ public partial class MainForm : Form
         _nudGridCols.ValueChanged += (s, e) => OnSettingsChanged();
         gridFlow.Controls.Add(headersPanel);
 
-        _gridPanel.Controls.Add(gridFlow);
-        flow.Controls.Add(_gridPanel);
+        _gridPanel = CreateColorCodedPanel("📏 Grid Cell Settings", Color.FromArgb(254, 249, 230), Color.FromArgb(230, 190, 120), gridFlow);
+        flowGrid.Controls.Add(_gridPanel);
 
-        _linedPanel = new Panel { AutoSize = true, Padding = new Padding(0, 10, 0, 0), Visible = false };
-        var linedFlow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
-        linedFlow.Controls.Add(new Label { Text = "Lined Page:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), AutoSize = true });
+        // Sub-Panel 5: Lined Page Rules (Light Lavender/Blue)
+        var linedFlow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
         var linedSettings = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
         linedSettings.Controls.Add(CreateLabeledNud("Line H (mm):", out _nudLineHeight, 2, 30, 8, 0.5m));
         linedSettings.Controls.Add(CreateColorButton("Color:", out _btnLineColor, Color.FromArgb(180, 200, 220)));
@@ -522,83 +677,151 @@ public partial class MainForm : Form
         _nudLineHeight.ValueChanged += (s, e) => OnSettingsChanged();
         _nudLineWidth.ValueChanged += (s, e) => OnSettingsChanged();
         linedFlow.Controls.Add(linedSettings);
-        
+
         _chkShowMarginLine = new CheckBox { Text = "Show Margin Line", AutoSize = true, Padding = new Padding(5, 5, 10, 5), Checked = true };
         _chkShowMarginLine.CheckedChanged += (s, e) => OnSettingsChanged();
         linedFlow.Controls.Add(_chkShowMarginLine);
-        
-        _linedPanel.Controls.Add(linedFlow);
-        flow.Controls.Add(_linedPanel);
 
-        _coverPanel = new Panel { AutoSize = true, Padding = new Padding(0, 10, 0, 0), Visible = false };
-        var coverFlow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
-        coverFlow.Controls.Add(new Label { Text = "Cover/Ending:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), AutoSize = true });
-        coverFlow.Controls.Add(CreateLabeledText("Title:", out _txtTitle, "汉字书写练习", 200));
-        coverFlow.Controls.Add(CreateLabeledText("Subtitle:", out _txtSubtitle, "Chinese Writing Practice", 200));
-        coverFlow.Controls.Add(CreateLabeledText("Author:", out _txtAuthor, "", 200));
-        coverFlow.Controls.Add(CreateLabeledText("Notes:", out _txtNotes, "", 200, true));
+        _linedPanel = CreateColorCodedPanel("≡ Lined Page Rules", Color.FromArgb(240, 244, 255), Color.FromArgb(160, 180, 220), linedFlow);
+        _linedPanel.Visible = false;
+        flowGrid.Controls.Add(_linedPanel);
+
+        tpGrid.Controls.Add(flowGrid);
+
+        // --- TAB 3: STYLE ---
+        var tpStyle = new TabPage("Style") { AutoScroll = true, Padding = new Padding(10), BackColor = Color.White };
+        var flowStyle = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+
+        var styleInner = new FlowLayoutPanel { AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+
+        var colorPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
+        colorPanel.Controls.Add(CreateColorButton("Border:", out _btnBorderColor, Color.FromArgb(40, 40, 40)));
+        colorPanel.Controls.Add(CreateLabeledNud("W:", out _nudBorderWidth, 0.1m, 5, 1.5m, 0.1m));
+        colorPanel.Controls.Add(CreateColorButton("Guide:", out _btnGuideColor, Color.FromArgb(180, 60, 60)));
+        colorPanel.Controls.Add(CreateLabeledNud("W:", out _nudGuideWidth, 0.1m, 3, 0.6m, 0.1m));
+        _nudBorderWidth.ValueChanged += (s, e) => OnSettingsChanged();
+        _nudGuideWidth.ValueChanged += (s, e) => OnSettingsChanged();
+        styleInner.Controls.Add(colorPanel);
+
+        var advancedGridPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
+        advancedGridPanel.Controls.Add(CreateColorButton("Cell BG:", out _btnCellBgColor, Color.White));
+        advancedGridPanel.Controls.Add(CreateColorButton("Page BG:", out _btnPageBgColor, Color.White));
+        advancedGridPanel.Controls.Add(CreateLabeledNud("Corner:", out _nudCornerRadius, 0, 20, 0, 0.5m));
+        advancedGridPanel.Controls.Add(CreateLabeledNud("Padding:", out _nudInnerPadding, 0, 10, 0, 0.5m));
+        _nudCornerRadius.ValueChanged += (s, e) => OnSettingsChanged();
+        _nudInnerPadding.ValueChanged += (s, e) => OnSettingsChanged();
+        styleInner.Controls.Add(advancedGridPanel);
+
+        var styleTogglePanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
+        _chkDashed = new CheckBox { Text = "Dashed Guides", AutoSize = true, Checked = true, Padding = new Padding(5, 5, 5, 5) };
+        _chkDashed.CheckedChanged += (s, e) => OnSettingsChanged();
+        _chkDotted = new CheckBox { Text = "Dotted Guides", AutoSize = true, Checked = false, Padding = new Padding(5, 5, 5, 5) };
+        _chkDotted.CheckedChanged += (s, e) => OnSettingsChanged();
+        _chkDiagonals = new CheckBox { Text = "Diagonal (米)", AutoSize = true, Padding = new Padding(5, 5, 5, 5) };
+        _chkDiagonals.CheckedChanged += (s, e) => OnSettingsChanged();
+        styleTogglePanel.Controls.Add(_chkDashed);
+        styleTogglePanel.Controls.Add(_chkDotted);
+        styleTogglePanel.Controls.Add(_chkDiagonals);
+        styleInner.Controls.Add(styleTogglePanel);
+
+        var shadingPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
+        _chkCellShading = new CheckBox { Text = "Cell Shading", AutoSize = true, Padding = new Padding(5, 5, 10, 5) };
+        _chkCellShading.CheckedChanged += (s, e) => OnSettingsChanged();
+        shadingPanel.Controls.Add(_chkCellShading);
+        shadingPanel.Controls.Add(CreateColorButton("Shade Color:", out _btnCellShadingColor, Color.FromArgb(250, 248, 240)));
+        styleInner.Controls.Add(shadingPanel);
+
+        flowStyle.Controls.Add(CreateColorCodedPanel("🎨 Visual Style & Colors", Color.FromArgb(248, 240, 250), Color.FromArgb(200, 150, 220), styleInner));
+
+        tpStyle.Controls.Add(flowStyle);
+
+        // --- TAB 4: COVER / ENDING ---
+        var tpCover = new TabPage("Cover/Ending") { AutoScroll = true, Padding = new Padding(10), BackColor = Color.White };
+        var flowCover = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+
+        // Sub-Panel 6: Cover Image & Standard Text (Light Soft Teal)
+        var coverTextInner = new FlowLayoutPanel { AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+
+        var imagePanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 0, 0, 10) };
+        imagePanel.Controls.Add(new Label { Text = "Cover Image:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), AutoSize = true, Padding = new Padding(0, 5, 5, 0) });
+        _btnSelectCoverImage = new Button { Text = "Select Image...", Width = 110, Height = 25, BackColor = Color.FromArgb(240, 240, 245), FlatStyle = FlatStyle.Flat };
+        _btnSelectCoverImage.Click += BtnSelectCoverImage_Click;
+        _btnClearCoverImage = new Button { Text = "Clear", Width = 60, Height = 25, BackColor = Color.FromArgb(240, 240, 245), FlatStyle = FlatStyle.Flat };
+        _btnClearCoverImage.Click += (s, e) =>
+        {
+            if (_selectedPageIndex >= 0)
+            {
+                var page = _project.Pages[_selectedPageIndex];
+                page.Elements.RemoveAll(x => x is CustomImageElement);
+                OnSettingsChanged();
+            }
+        };
+        imagePanel.Controls.Add(_btnSelectCoverImage);
+        imagePanel.Controls.Add(_btnClearCoverImage);
+        coverTextInner.Controls.Add(imagePanel);
+
+        coverTextInner.Controls.Add(CreateLabeledText("Title:", out _txtTitle, "汉字书写练习", 200));
+        coverTextInner.Controls.Add(CreateLabeledText("Subtitle:", out _txtSubtitle, "Chinese Writing Practice", 200));
+        coverTextInner.Controls.Add(CreateLabeledText("Author:", out _txtAuthor, "", 200));
+        coverTextInner.Controls.Add(CreateLabeledText("Notes:", out _txtNotes, "", 200, true));
         foreach (TextBox txt in new[] { _txtTitle, _txtSubtitle, _txtAuthor, _txtNotes })
             txt.TextChanged += (s, e) => OnSettingsChanged();
-        
-        // Add font size controls
+
         var fontSizePanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 5, 0, 0) };
-        fontSizePanel.Controls.Add(new Label { Text = "Font Sizes:", Font = new Font("Segoe UI", 8F, FontStyle.Italic), AutoSize = true, Padding = new Padding(5, 8, 5, 0) });
+        fontSizePanel.Controls.Add(new Label { Text = "Sizes:", Font = new Font("Segoe UI", 8F, FontStyle.Italic), AutoSize = true, Padding = new Padding(0, 5, 5, 0) });
         fontSizePanel.Controls.Add(CreateLabeledNud("Title:", out _nudTitleFontSize, 8, 72, 36, 1));
         fontSizePanel.Controls.Add(CreateLabeledNud("Sub:", out _nudSubtitleFontSize, 6, 36, 14, 1));
         fontSizePanel.Controls.Add(CreateLabeledNud("Auth:", out _nudAuthorFontSize, 6, 36, 14, 1));
         fontSizePanel.Controls.Add(CreateLabeledNud("Notes:", out _nudNotesFontSize, 6, 24, 10, 1));
         foreach (var nud in new[] { _nudTitleFontSize, _nudSubtitleFontSize, _nudAuthorFontSize, _nudNotesFontSize })
             nud.ValueChanged += (s, e) => OnSettingsChanged();
-        coverFlow.Controls.Add(fontSizePanel);
-        
-        _coverPanel.Controls.Add(coverFlow);
-        flow.Controls.Add(_coverPanel);
+        coverTextInner.Controls.Add(fontSizePanel);
 
-        // Add page label and action buttons
-        var pageLabelPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 10, 0, 0) };
-        pageLabelPanel.Controls.Add(new Label { Text = "Page Label:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), AutoSize = true, Padding = new Padding(5, 8, 5, 0) });
-        pageLabelPanel.Controls.Add(CreateLabeledText("Custom Name:", out _txtPageLabel, "", 180));
-        _txtPageLabel.TextChanged += (s, e) => OnSettingsChanged();
-        flow.Controls.Add(pageLabelPanel);
+        _coverPanel = CreateColorCodedPanel("🖼️ Cover Image & Standard Text", Color.FromArgb(235, 248, 248), Color.FromArgb(130, 200, 200), coverTextInner);
+        flowCover.Controls.Add(_coverPanel);
 
-        var actionPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 10, 0, 0) };
-        _btnApplyToAll = new Button { Text = "Apply to All Pages", Width = 120, Height = 28, BackColor = Color.FromArgb(60, 60, 80), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-        _btnApplyToAll.FlatAppearance.BorderSize = 0;
-        _btnApplyToAll.Click += BtnApplyToAll_Click;
-        _btnResetDefaults = new Button { Text = "Reset Defaults", Width = 100, Height = 28, BackColor = Color.FromArgb(180, 180, 200), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-        _btnResetDefaults.FlatAppearance.BorderSize = 0;
-        _btnResetDefaults.Click += BtnResetDefaults_Click;
-        _btnMultiply = new Button { Text = "Multiply to All", Width = 110, Height = 28, BackColor = Color.FromArgb(40, 120, 60), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-        _btnMultiply.FlatAppearance.BorderSize = 0;
-        _btnMultiply.Click += BtnMultiply_Click;
-        actionPanel.Controls.Add(_btnApplyToAll);
-        actionPanel.Controls.Add(_btnResetDefaults);
-        actionPanel.Controls.Add(_btnMultiply);
-        flow.Controls.Add(actionPanel);
+        // Sub-Panel 7: Custom Text Blocks (Light Soft Coral/Peach)
+        _customTextFlow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
 
-        _pageTypePanel = new Panel { AutoSize = true };
-        flow.Controls.Add(_pageTypePanel);
+        var customHeader = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(0, 0, 0, 5) };
+        customHeader.Controls.Add(new Label { Text = "Dynamic Blocks:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), AutoSize = true, Padding = new Padding(0, 5, 5, 0) });
+        _btnAddCustomText = new Button { Text = "➕ Add Text Block", Width = 140, Height = 25, BackColor = Color.FromArgb(80, 140, 190), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        _btnAddCustomText.FlatAppearance.BorderSize = 0;
+        _btnAddCustomText.Click += BtnAddCustomText_Click;
+        customHeader.Controls.Add(_btnAddCustomText);
+        _customTextFlow.Controls.Add(customHeader);
 
-        panel.Controls.Add(flow);
-        _settingsFlow = flow;
+        flowCover.Controls.Add(CreateColorCodedPanel("📝 Custom Text Blocks", Color.FromArgb(255, 243, 235), Color.FromArgb(240, 160, 120), _customTextFlow));
+
+        tpCover.Controls.Add(flowCover);
+
+        // Add all tabs
+        _settingsTabControl.TabPages.Add(tpLayout);
+        _settingsTabControl.TabPages.Add(tpGrid);
+        _settingsTabControl.TabPages.Add(tpStyle);
+        _settingsTabControl.TabPages.Add(tpCover);
+
+        panel.Controls.Add(_settingsTabControl);
+
+        _settingsFlow = new FlowLayoutPanel();
         return panel;
     }
 
-    private Panel CreateLabeledNud(string label, out NumericUpDown nud, decimal min, decimal max, decimal value, decimal increment)
+    private FlowLayoutPanel CreateLabeledNud(string label, out NumericUpDown nud, decimal min, decimal max, decimal value, decimal increment)
     {
-        var panel = new Panel { AutoSize = true, Padding = new Padding(5) };
-        var lbl = new Label { Text = label, AutoSize = true, Padding = new Padding(0, 5, 5, 0) };
-        nud = new NumericUpDown { Minimum = min, Maximum = max, Value = value, Increment = increment, Width = 60, DecimalPlaces = increment < 1 ? 1 : 0 };
+        var panel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = new Padding(0) };
+        var lbl = new Label { Text = label, AutoSize = true, Padding = new Padding(0, 5, 5, 0), Anchor = AnchorStyles.Left | AnchorStyles.Top };
+        nud = new NumericUpDown { Minimum = min, Maximum = max, Value = value, Increment = increment, Width = 55, DecimalPlaces = increment < 1 ? 1 : 0 };
         panel.Controls.Add(lbl);
         panel.Controls.Add(nud);
         return panel;
     }
 
-    private Panel CreateLabeledCombo(string label, out ComboBox cbo, string[] items)
+    private FlowLayoutPanel CreateLabeledCombo(string label, out ComboBox cbo, string[] items)
     {
-        var panel = new Panel { AutoSize = true, Padding = new Padding(5) };
-        var lbl = new Label { Text = label, AutoSize = true, Padding = new Padding(0, 5, 5, 0) };
-        cbo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
+        var panel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = new Padding(0) };
+        var lbl = new Label { Text = label, AutoSize = true, Padding = new Padding(0, 5, 5, 0), Anchor = AnchorStyles.Left | AnchorStyles.Top };
+        cbo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 180 };
         cbo.Items.AddRange(items);
         if (items.Length > 0) cbo.SelectedIndex = 0;
         panel.Controls.Add(lbl);
@@ -606,10 +829,10 @@ public partial class MainForm : Form
         return panel;
     }
 
-    private Panel CreateLabeledText(string label, out TextBox txt, string defaultValue, int width, bool multiline = false)
+    private FlowLayoutPanel CreateLabeledText(string label, out TextBox txt, string defaultValue, int width, bool multiline = false)
     {
-        var panel = new Panel { AutoSize = true, Padding = new Padding(5) };
-        var lbl = new Label { Text = label, AutoSize = true, Padding = new Padding(0, 5, 5, 0) };
+        var panel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = new Padding(0) };
+        var lbl = new Label { Text = label, AutoSize = true, Padding = new Padding(0, 5, 5, 0), Anchor = AnchorStyles.Left | AnchorStyles.Top };
         txt = new TextBox { Width = width, Text = defaultValue };
         if (multiline) { txt.Multiline = true; txt.Height = 60; }
         panel.Controls.Add(lbl);
@@ -617,11 +840,11 @@ public partial class MainForm : Form
         return panel;
     }
 
-    private Panel CreateColorButton(string label, out Button btn, Color initialColor)
+    private FlowLayoutPanel CreateColorButton(string label, out Button btn, Color initialColor)
     {
-        var panel = new Panel { AutoSize = true, Padding = new Padding(5) };
-        var lbl = new Label { Text = label, AutoSize = true, Padding = new Padding(0, 5, 5, 0) };
-        var button = new Button { Width = 80, Height = 25, BackColor = initialColor, FlatStyle = FlatStyle.Flat };
+        var panel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = new Padding(0) };
+        var lbl = new Label { Text = label, AutoSize = true, Padding = new Padding(0, 5, 5, 0), Anchor = AnchorStyles.Left | AnchorStyles.Top };
+        var button = new Button { Width = 70, Height = 23, BackColor = initialColor, FlatStyle = FlatStyle.Flat };
         button.FlatAppearance.BorderColor = Color.Gray;
         button.Tag = initialColor;
         button.Click += (s, e) =>
@@ -664,8 +887,9 @@ public partial class MainForm : Form
         {
             _cboPageType.SelectedIndex = page.Type switch
             {
-                PageType.Cover => 0, PageType.TianzigeGrid => 1, PageType.MizigeGrid => 2,
-                PageType.JiugonggeGrid => 3, PageType.Lined => 4, PageType.Blank => 5, PageType.Ending => 6, _ => 1
+                PageType.TianzigeGrid => 0, PageType.JiugonggeGrid => 1,
+                PageType.EssayGrid => 2, PageType.Vocabulary => 3,
+                PageType.Lined => 4, PageType.Blank => 5, PageType.Custom => 6, _ => 0
             };
             var pageSize = PageSizeInfo.All.FirstOrDefault(p => p.Name == page.PageSizeName);
             _cboPageSize.SelectedIndex = pageSize != null ? Array.IndexOf(PageSizeInfo.All.ToArray(), pageSize) : 1;
@@ -712,7 +936,9 @@ public partial class MainForm : Form
             if (_txtPageLabel != null) _txtPageLabel.Text = page.PageLabel;
             if (_nudGridRows != null) _nudGridRows.Value = page.GridRowsOverride;
             if (_nudGridCols != null) _nudGridCols.Value = page.GridColsOverride;
-            
+
+            RefreshCustomTextUI(page);
+
             UpdatePanelVisibility();
             _preview.PageSettings = page;
             _preview.Invalidate();
@@ -724,12 +950,13 @@ public partial class MainForm : Form
     {
         var pageType = _cboPageType.SelectedIndex switch
         {
-            0 => PageType.Cover, 1 => PageType.TianzigeGrid, 2 => PageType.MizigeGrid,
-            3 => PageType.JiugonggeGrid, 4 => PageType.Lined, 5 => PageType.Blank, 6 => PageType.Ending, _ => PageType.TianzigeGrid
+            0 => PageType.TianzigeGrid, 1 => PageType.JiugonggeGrid,
+            2 => PageType.EssayGrid, 3 => PageType.Vocabulary,
+            4 => PageType.Lined, 5 => PageType.Blank, 6 => PageType.Custom, _ => PageType.TianzigeGrid
         };
-        _gridPanel.Visible = pageType is PageType.TianzigeGrid or PageType.MizigeGrid or PageType.JiugonggeGrid;
+        _gridPanel.Visible = pageType is PageType.TianzigeGrid or PageType.JiugonggeGrid or PageType.EssayGrid or PageType.Vocabulary;
         _linedPanel.Visible = pageType == PageType.Lined;
-        _coverPanel.Visible = pageType is PageType.Cover or PageType.Ending;
+        _coverPanel.Visible = true; // Always visible on Cover/Ending tab
     }
 
     private void OnSettingsChanged()
@@ -738,8 +965,9 @@ public partial class MainForm : Form
         var page = _project.Pages[_selectedPageIndex];
         page.Type = _cboPageType.SelectedIndex switch
         {
-            0 => PageType.Cover, 1 => PageType.TianzigeGrid, 2 => PageType.MizigeGrid,
-            3 => PageType.JiugonggeGrid, 4 => PageType.Lined, 5 => PageType.Blank, 6 => PageType.Ending, _ => PageType.TianzigeGrid
+            0 => PageType.TianzigeGrid, 1 => PageType.JiugonggeGrid,
+            2 => PageType.EssayGrid, 3 => PageType.Vocabulary,
+            4 => PageType.Lined, 5 => PageType.Blank, 6 => PageType.Custom, _ => PageType.TianzigeGrid
         };
         page.Landscape = _chkLandscape.Checked;
         page.MarginTopMm = (float)_nudMarginTop.Value;
@@ -936,20 +1164,135 @@ public partial class MainForm : Form
     private void BtnMultiply_Click(object? sender, EventArgs e)
     {
         if (_selectedPageIndex < 0) return;
-        if (MessageBox.Show("Multiply current page settings to all other pages?\nThis will overwrite all other pages with the current page's settings.", "Confirm Multiply", MessageBoxButtons.YesNo) != DialogResult.Yes)
-            return;
+
+        int count = ShowMultiplyDialog();
+        if (count <= 0) return;
         
         var source = _project.Pages[_selectedPageIndex];
-        for (int i = 0; i < _project.Pages.Count; i++)
+        for (int i = 0; i < count; i++)
         {
-            if (i != _selectedPageIndex)
-            {
-                _project.Pages[i] = source.Clone();
-            }
+            _project.Pages.Insert(_selectedPageIndex + 1 + i, source.Clone());
         }
+
         RefreshPageList();
         _pageList.SelectedIndex = _selectedPageIndex;
-        _lblStatus.Text = "Current page settings multiplied to all pages";
+        _lblStatus.Text = $"Duplicated page {count} times";
+    }
+
+    private int ShowMultiplyDialog()
+    {
+        using var form = new Form
+        {
+            Text = "Multiply Page",
+            Size = new Size(300, 150),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false
+        };
+
+        var lbl = new Label { Text = "How many times should this page be duplicated?", AutoSize = true, Location = new Point(10, 15) };
+        var nud = new NumericUpDown { Minimum = 1, Maximum = 100, Value = 1, Location = new Point(10, 40), Width = 100 };
+        var btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(100, 75) };
+        var btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Location = new Point(185, 75) };
+
+        form.Controls.AddRange(new Control[] { lbl, nud, btnOk, btnCancel });
+        form.AcceptButton = btnOk;
+        form.CancelButton = btnCancel;
+
+        if (form.ShowDialog() == DialogResult.OK)
+            return (int)nud.Value;
+        return 0;
+    }
+
+    private void BtnSelectCoverImage_Click(object? sender, EventArgs e)
+    {
+        if (_selectedPageIndex < 0) return;
+        using var dlg = new OpenFileDialog { Filter = "Image Files|*.jpg;*.jpeg;*.png;*.bmp", Title = "Select Cover Image" };
+        if (dlg.ShowDialog() == DialogResult.OK)
+        {
+            try
+            {
+                byte[] imageBytes = File.ReadAllBytes(dlg.FileName);
+                string base64 = Convert.ToBase64String(imageBytes);
+
+                var page = _project.Pages[_selectedPageIndex];
+                page.Elements.RemoveAll(x => x is CustomImageElement);
+                page.Elements.Add(new CustomImageElement { Base64Image = base64 });
+
+                OnSettingsChanged();
+            }
+            catch (Exception ex) { MessageBox.Show($"Failed to load image: {ex.Message}"); }
+        }
+    }
+
+    private void BtnAddCustomText_Click(object? sender, EventArgs e)
+    {
+        if (_selectedPageIndex < 0) return;
+        var page = _project.Pages[_selectedPageIndex];
+        page.Elements.Add(new CustomTextElement { Text = "New Text Block" });
+        RefreshCustomTextUI(page);
+        OnSettingsChanged();
+    }
+
+    private void RefreshCustomTextUI(PageSettings page)
+    {
+        _customTextFlow.SuspendLayout();
+
+        // Clear all existing dynamically generated blocks (skip the first header block)
+        while (_customTextFlow.Controls.Count > 1)
+        {
+            var ctrl = _customTextFlow.Controls[1];
+            _customTextFlow.Controls.RemoveAt(1);
+            ctrl.Dispose();
+        }
+
+        var texts = page.Elements.OfType<CustomTextElement>().ToList();
+        if (texts.Count > 0)
+        {
+            for (int i = 0; i < texts.Count; i++)
+            {
+                var txt = texts[i];
+
+                var panel = new Panel { AutoSize = true, BorderStyle = BorderStyle.FixedSingle, Padding = new Padding(5), Margin = new Padding(0, 5, 0, 5) };
+                var flow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+
+                // Text Input
+                var txtInput = new TextBox { Width = 250, Text = txt.Text, Multiline = true, Height = 40 };
+                txtInput.TextChanged += (s, e) => { txt.Text = txtInput.Text; OnSettingsChanged(); };
+                flow.Controls.Add(txtInput);
+
+                // Controls (Font Size, Top/Bottom Margin)
+                var ctrlFlow = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+
+                var nudSize = new NumericUpDown { Width = 50, Minimum = 6, Maximum = 100, Value = (decimal)txt.FontSizePt };
+                nudSize.ValueChanged += (s, e) => { txt.FontSizePt = (float)nudSize.Value; OnSettingsChanged(); };
+
+                var nudTop = new NumericUpDown { Width = 50, Minimum = 0, Maximum = 100, Value = (decimal)txt.Y_Mm };
+                nudTop.ValueChanged += (s, e) => { txt.Y_Mm = (float)nudTop.Value; OnSettingsChanged(); };
+
+                var btnDel = new Button { Text = "X", Width = 30, ForeColor = Color.Red };
+                btnDel.Click += (s, e) => {
+                    page.Elements.Remove(txt);
+                    RefreshCustomTextUI(page);
+                    OnSettingsChanged();
+                };
+
+                ctrlFlow.Controls.Add(new Label { Text = "Size:", AutoSize = true, Padding = new Padding(0, 5, 0, 0) });
+                ctrlFlow.Controls.Add(nudSize);
+                ctrlFlow.Controls.Add(new Label { Text = "Gap:", AutoSize = true, Padding = new Padding(10, 5, 0, 0) });
+                ctrlFlow.Controls.Add(nudTop);
+                ctrlFlow.Controls.Add(btnDel);
+
+                flow.Controls.Add(ctrlFlow);
+                panel.Controls.Add(flow);
+                _customTextFlow.Controls.Add(panel);
+            }
+        }
+
+        _customTextFlow.ResumeLayout(true);
+        _customTextFlow.PerformLayout();
+        _coverPanel.PerformLayout();
     }
 
     private void BtnNew_Click(object? sender, EventArgs e)

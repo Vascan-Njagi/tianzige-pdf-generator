@@ -1,119 +1,120 @@
 # 田字格生成器 - Tianzige PDF Generator
 
-A C# WinForms application for generating customizable Chinese character writing grid PDFs.
+A modern .NET 10 WinForms desktop application for generating and customizing Chinese calligraphy grids, vocabulary practice sheets, essay manuscript pages, lined notebooks, and custom cover pages for PDF export.
 
-## Features
+---
 
-- **Grid Types**: 田字格 (Tianzige), 米字格 (Mizige), 九宫格 (Jiugongge)
-- **Page Types**: Cover, Grid, Lined, Blank, Ending
-- **Page Sizes**: A3, A4, A5, B4, B5, Letter, Legal, Tabloid
-- **Customization**: Cell size, spacing, margins, colors, line widths, dashed/solid guides
-- **Live Preview**: Real-time visual feedback as you adjust settings
-- **PDF Export**: High-quality output via QuestPDF + SkiaSharp
-- **Project Save/Load**: JSON-based `.tzp` project files
+## 🌟 Up-to-Date Features
 
-## Prerequisites
+### 📐 Grid & Page Types
+- **Tianzige (田字格)**: Classic 2x2 cross guide lines for character balance.
+- **Jiugongge (九宫格)**: 3x3 9-cell grid for detailed character stroke proportions.
+- **Essay Grid (作文格)**: Continuous manuscript grid layout for writing essays.
+- **Vocabulary Sheets (生字本)**: Grid cells paired with Pinyin top boxes and lined translation spaces.
+- **Lined Notebook (横线本)**: Customizable line spacing, line weight, line color, and optional vertical margin rule.
+- **Blank & Custom Pages**: Cover/ending templates with customizable title, subtitle, author, notes, and cover image upload.
 
-### 1. Install .NET 10 SDK
+### 📐 Dimensions & Layout Control
+- **Page Sizes**: A3, A4, A5, B4, B5, Letter, Legal, Tabloid, and Custom dimensions.
+- **Orientation**: Instant toggle between Portrait and Landscape modes.
+- **Margins & Spacing**: Millimeter-precision controls for Top, Bottom, Left, Right margins, cell size, cell gap, row gap, and column gap.
+- **Overrides & Headers**: Custom column headers (text above grid columns) and explicit Row/Column overrides.
 
-Download from: https://dotnet.microsoft.com/download/dotnet/10.0
+### 🎨 Visual Styling & Theming
+- **Guides**: Choose Dashed, Dotted, or Solid guide lines with custom guide colors and stroke widths.
+- **Diagonals (米字格)**: Toggle diagonal guides on grid cells.
+- **Borders & Corners**: Outer cell border colors, line thickness, rounded cell corner radius, and cell inner padding.
+- **Color Customization**: Customizable page background, cell background, guide colors, line colors, and optional cell shading tint.
 
-Verify: `dotnet --version` should show `10.0.xxx`
+### 🖥️ Interactive Desktop UI
+- **Resizable 3-Panel Splitter**: Drag splitters between **Page Settings**, **Live Preview**, and **Pages Tree** with app-wide minimum size safeguards.
+- **GDI+ Live Preview**: Smooth, real-time rendering of grid pages as settings change.
+- **Page Management**: Add, duplicate, reorder (move up/down), remove, multiply pages, or apply current page settings across all pages in the document.
+- **Dynamic Text Blocks**: Add, remove, and position dynamic text blocks on custom/cover pages with font size and gap controls.
 
-### 2. Install Visual Studio 2026 (or VS 2022 17.10+)
+### 📄 Export & Persistence
+- **PDF Export**: Vector-quality PDF documents generated via **QuestPDF** and **SkiaSharp**.
+- **Project Files**: Save and load complete multi-page document projects using JSON `.tzp` project files.
 
-During installation, select the **".NET desktop development"** workload. This includes:
-- .NET 10 SDK
-- Windows Forms project templates
-- NuGet package manager
+---
 
-### 3. NuGet Packages (auto-restored on first build)
+## 🚧 Unfinished Stuff & Work in Progress
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| QuestPDF | 2024.10.3 | PDF generation (includes SkiaSharp) |
+The following features and improvements are actively being worked on:
 
-No manual download needed — `dotnet restore` or Visual Studio handles this automatically.
+- [ ] **Responsive Page Actions Layout**: Improved auto-wrapping and percentage-based scaling for global page action buttons on narrower panels.
+- [ ] **Character & Stroke Order Overlay (描红 / 字帖)**: Ability to print gray stroke-order tracing characters directly inside grid cells for writing practice.
+- [ ] **Vertical Chinese Reading Layout**: Right-to-left vertical column manuscript layout for traditional Chinese essay sheets.
+- [ ] **Page Numbering & Headers/Footers**: Automatic dynamic page numbers (`Page X of Y`), headers, and footers across multi-page PDF exports.
+- [ ] **Rich Text Formatting in Text Blocks**: Per-block font family selection, alignment (Left/Center/Right), text color, and bold/italic toggles for custom text blocks.
+- [ ] **Preset Template Library**: Quick-start design presets (e.g. Primary School Practice, HSK Vocabulary, Calligraphy Examination).
 
-## Project Structure
+---
+
+## 🛠️ Project Structure
 
 ```
-tianzege/
-├── TianzigeGenerator.sln           # Solution file (open this in VS)
-├── .gitignore
-├── README.md
-└── TianzigeGenerator/
-    ├── TianzigeGenerator.csproj     # Project file (net10.0-windows)
-    ├── Program.cs                   # Entry point
-    ├── MainForm.cs                  # Main window UI + event handlers
-    ├── Models/
-    │   ├── PageType.cs              # Enum: Cover, TianzigeGrid, MizigeGrid, etc.
-    │   ├── PageSizeInfo.cs          # Standard page size definitions
-    │   ├── GridStyle.cs             # Visual style (colors, line widths)
-    │   ├── PageSettings.cs          # Per-page configuration
-    │   └── Project.cs               # Multi-page document + JSON serialization
-    ├── Controls/
-    │   └── GridPreviewControl.cs    # Custom GDI+ live preview control
-    └── Services/
-        ├── GridRenderer.cs          # GDI+ renderer for preview
-        └── PdfGenerator.cs          # QuestPDF/SkiaSharp PDF exporter
+src/TianzigeGenerator/
+├── TianzigeGenerator.csproj     # .NET 10 Windows Forms project file
+├── Program.cs                   # Application entry point
+├── MainForm.cs                  # Main window, event handlers & responsive splitter layout
+├── Models/
+│   ├── PageType.cs              # Enum: TianzigeGrid, JiugonggeGrid, EssayGrid, Vocabulary, Lined, Blank, Custom
+│   ├── PageSizeInfo.cs          # Standard paper sizes (A4, A3, B5, Letter, etc.)
+│   ├── GridStyle.cs             # Styling settings (colors, borders, guide dash patterns, corner radius)
+│   ├── PageSettings.cs          # Per-page settings, margins, headers, text blocks, and dimensions
+│   ├── CustomElement.cs         # Base model for WYSIWYG elements
+│   ├── CustomTextElement.cs     # Text block element model
+│   ├── CustomImageElement.cs    # Image element model
+│   └── Project.cs               # Multi-page project document model + JSON serialization
+├── Controls/
+│   └── GridPreviewControl.cs    # Double-buffered GDI+ live preview control
+└── Services/
+    ├── GridRenderer.cs          # GDI+ renderer for live preview
+    ├── PdfGenerator.cs          # QuestPDF + SkiaSharp PDF exporter
+    └── QuestPdfSkiaExtensions.cs # Canvas extension for SkiaSharp vector drawing inside QuestPDF
 ```
 
-## How to Build & Run
+---
 
-### Option A: Visual Studio 2026
+## 🚀 How to Build & Run
 
-1. Double-click `TianzigeGenerator.sln` to open in Visual Studio
-2. Wait for NuGet packages to restore (check Output window)
-3. Press **F5** or click **▶ Start** to build and run
+### Prerequisites
+1. **.NET 10 SDK**: [Download .NET 10](https://dotnet.microsoft.com/download/dotnet/10.0)
+2. **Visual Studio 2026** (or VS 2022 17.10+) with the **.NET desktop development** workload.
 
-If packages don't restore automatically:
-- Right-click solution → **Restore NuGet Packages**
-
-### Option B: Command Line
-
+### Command Line
 ```powershell
-cd g:\Proj\tianzege\TianzigeGenerator
-dotnet restore    # Download NuGet packages
-dotnet build      # Compile
-dotnet run        # Launch the app
+# Restore NuGet dependencies
+dotnet restore
+
+# Build project
+dotnet build "src/TianzigeGenerator/TianzigeGenerator.csproj"
+
+# Launch app
+dotnet run --project "src/TianzigeGenerator/TianzigeGenerator.csproj"
 ```
 
-### Option C: Publish Standalone EXE
+### Visual Studio
+1. Open `TianzigeGenerator.sln`.
+2. Press **F5** or click **▶ Start**.
 
-```powershell
-dotnet publish -c Release -r win-x64 --self-contained -o .\publish
-```
+---
 
-This creates a standalone folder with everything needed to run (no .NET install required on target machine).
+## 📋 Usage Guide
 
-## Usage Guide
+1. **Add & Select Pages**: Click **➕ Add Page** in the right-hand **Pages** panel to create pages.
+2. **Configure Layout**: Switch between **Layout**, **Grid / Lines**, **Style**, and **Cover/Ending** tabs in the **Page Settings** panel.
+3. **Adjust Proportions**: Drag the vertical splitter bars between panels to customize panel widths to your preference.
+4. **Save Project**: Use **💾 Save Project** to store your document as a `.tzp` file.
+5. **Export PDF**: Click **📄 Generate PDF** to render a PDF document.
 
-1. **Add Pages**: Click ➕ Add Page to add grid pages
-2. **Configure**: Select a page, adjust settings in the right panel
-3. **Grid Type**: Choose Tianzige, Mizige, or Jiugongge
-4. **Cell Size**: Set in millimeters (typical: 15mm for practice)
-5. **Style**: Customize colors, line widths, dashed/solid lines
-6. **Cover/Ending**: Add title, subtitle, author name
-7. **Reorder**: Use ⬆⬇ buttons to arrange pages
-8. **Save Project**: 💾 Save as `.tzp` file
-9. **Generate PDF**: 📄 Generate PDF to create the final document
+---
 
-## Troubleshooting
+## 🧰 Technical Stack
 
-| Issue | Solution |
-|-------|----------|
-| `QuestPDF namespace not found` | Run `dotnet restore` |
-| Chinese characters show as □ boxes | Install Chinese language fonts |
-| Build fails with .NET version error | Ensure .NET 10 SDK is installed |
-| PDF generation slow on first run | Normal — SkiaSharp initializes once |
-
-## Technical Details
-
-- **Framework**: .NET 10.0, Windows Forms
-- **PDF Library**: QuestPDF 2024.10.3 (Community License)
-- **Preview Rendering**: GDI+ (System.Drawing)
-- **PDF Rendering**: SkiaSharp (via QuestPDF Canvas)
-- **Serialization**: System.Text.Json
-- **Fonts**: Microsoft YaHei (Chinese), Segoe UI (English)
-
+- **Target Framework**: .NET 10.0 (`net10.0-windows`)
+- **UI Framework**: Windows Forms (WinForms) with custom GDI+ controls & `SplitContainer` panels
+- **PDF Generation**: QuestPDF (2024.10.3)
+- **Vector Rendering**: SkiaSharp (2.88.8)
+- **Serialization**: `System.Text.Json`

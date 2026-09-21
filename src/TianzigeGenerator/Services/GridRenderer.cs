@@ -11,12 +11,6 @@ public static class GridRenderer
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
-        using (var bgBrush = new SolidBrush(page.Style.PageBackground))
-            g.FillRectangle(bgBrush, targetRect);
-
-        using (var pageBorderPen = new Pen(Color.FromArgb(180, 180, 180), 1f))
-            g.DrawRectangle(pageBorderPen, targetRect.X, targetRect.Y, targetRect.Width, targetRect.Height);
-
         float pageWidthMm = page.EffectiveWidthMm;
         float pageHeightMm = page.EffectiveHeightMm;
         float scaleX = targetRect.Width / pageWidthMm;
@@ -27,6 +21,26 @@ public static class GridRenderer
         float drawnH = pageHeightMm * scale;
         float offsetX = targetRect.X + (targetRect.Width - drawnW) / 2;
         float offsetY = targetRect.Y + (targetRect.Height - drawnH) / 2;
+
+        // Draw drop shadow
+        using (var shadowBrush = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
+        {
+            var shadowRect = new RectangleF(offsetX + 4, offsetY + 4, drawnW, drawnH);
+            g.FillRectangle(shadowBrush, shadowRect);
+        }
+
+        // Draw page background (add slight cream tint if white for preview distinction)
+        Color previewBg = page.Style.PageBackground;
+        if (previewBg.R == 255 && previewBg.G == 255 && previewBg.B == 255)
+        {
+            previewBg = Color.FromArgb(253, 252, 246); // Slight cream
+        }
+        using (var bgBrush = new SolidBrush(previewBg))
+            g.FillRectangle(bgBrush, offsetX, offsetY, drawnW, drawnH);
+
+        // Draw page border
+        using (var pageBorderPen = new Pen(Color.FromArgb(180, 180, 180), 1f))
+            g.DrawRectangle(pageBorderPen, offsetX, offsetY, drawnW, drawnH);
 
         float contentX = offsetX + page.MarginLeftMm * scale;
         float contentY = offsetY + page.MarginTopMm * scale;
@@ -40,13 +54,14 @@ public static class GridRenderer
             case PageType.TianzigeGrid:
             case PageType.MizigeGrid:
             case PageType.JiugonggeGrid:
+            case PageType.EssayGrid:
                 RenderGridPage(g, page, contentX, contentY, contentW, contentH, scale);
                 break;
-            case PageType.Cover:
-                RenderCoverPage(g, page, offsetX, offsetY, drawnW, drawnH, scale);
+            case PageType.Vocabulary:
+                RenderVocabularyPage(g, page, contentX, contentY, contentW, contentH, scale);
                 break;
-            case PageType.Ending:
-                RenderEndingPage(g, page, offsetX, offsetY, drawnW, drawnH, scale);
+            case PageType.Custom:
+                RenderCustomPage(g, page, offsetX, offsetY, drawnW, drawnH, scale);
                 break;
             case PageType.Lined:
                 RenderLinedPage(g, page, contentX, contentY, contentW, contentH, scale);
@@ -84,7 +99,7 @@ public static class GridRenderer
             float headerFontSize = Math.Max(6, cellSizePx * 0.2f);
             using var headerFont = new Font("Microsoft YaHei", headerFontSize);
             using var headerBrush = new SolidBrush(Color.FromArgb(100, page.Style.BorderColor));
-            var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Far };
+            using var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Far };
             
             for (int c = 0; c < Math.Min(cols, headers.Length); c++)
             {
@@ -151,7 +166,9 @@ public static class GridRenderer
             }
         }
 
-        // Apply inner padding for guide lines
+        // Apply inner padding for guide lines (skip for Essay Grid since it has no inner guides)
+        if (page.Type == PageType.EssayGrid) return;
+
         float paddingPx = page.Style.CellInnerPaddingMm * (cell.Width / page.CellSizeMm);
         var guideRect = new RectangleF(
             cell.X + paddingPx,
@@ -174,15 +191,10 @@ public static class GridRenderer
             float midX = guideRect.X + guideRect.Width / 2;
             float midY = guideRect.Y + guideRect.Height / 2;
 
-            if (page.Type == PageType.TianzigeGrid || page.Type == PageType.MizigeGrid)
+            if (page.Type == PageType.TianzigeGrid)
             {
                 g.DrawLine(guidePen, guideRect.X, midY, guideRect.Right, midY);
                 g.DrawLine(guidePen, midX, guideRect.Y, midX, guideRect.Bottom);
-            }
-            if (page.Type == PageType.MizigeGrid)
-            {
-                g.DrawLine(guidePen, guideRect.X, guideRect.Y, guideRect.Right, guideRect.Bottom);
-                g.DrawLine(guidePen, guideRect.Right, guideRect.Y, guideRect.X, guideRect.Bottom);
             }
             if (page.Type == PageType.JiugonggeGrid)
             {
@@ -207,8 +219,68 @@ public static class GridRenderer
         return path;
     }
 
-    private static void RenderCoverPage(Graphics g, PageSettings page, float px, float py, float pw, float ph, float scale)
+    private static void RenderVocabularyPage(Graphics g, PageSettings page, float cx, float cy, float cw, float ch, float scale)
     {
+        float cellSizePx = page.CellSizeMm * scale;
+        float pinyinHeightPx = page.PinyinHeightMm * scale;
+        float colSpacingPx = page.ColumnSpacingMm * scale;
+        float rowSpacingPx = page.LineSpacingMm * scale;
+        if (cellSizePx <= 0) return;
+
+        // In vocabulary mode, we render pairs of (Pinyin Box + Character Box) vertically,
+        // with translation/meaning lines to the right of the grid block.
+
+        int cols, rows;
+        if (page.GridColsOverride > 0)
+            cols = page.GridColsOverride;
+        else
+            cols = Math.Max(1, (int)(cw * 0.4f / (cellSizePx + colSpacingPx))); // Use ~40% of width for grids
+
+        if (page.GridRowsOverride > 0)
+            rows = page.GridRowsOverride;
+        else
+            rows = Math.Max(1, (int)((ch + rowSpacingPx) / (cellSizePx + pinyinHeightPx + rowSpacingPx)));
+
+        float totalGridW = cols * cellSizePx + (cols - 1) * colSpacingPx;
+        float totalGridH = rows * (cellSizePx + pinyinHeightPx) + (rows - 1) * rowSpacingPx;
+        float startX = cx; // Align left
+        float startY = cy + (ch - totalGridH) / 2; // Center vertically
+
+        using var borderPen = new Pen(page.Style.BorderColor, page.Style.BorderWidthPt);
+        using var linePen = new Pen(page.LineColor, page.LineWidthPt);
+
+        for (int r = 0; r < rows; r++)
+        {
+            float rowY = startY + r * (cellSizePx + pinyinHeightPx + rowSpacingPx);
+
+            // Draw grids for this row
+            for (int c = 0; c < cols; c++)
+            {
+                float x = startX + c * (cellSizePx + colSpacingPx);
+
+                // Draw Pinyin Box
+                g.DrawRectangle(borderPen, x, rowY, cellSizePx, pinyinHeightPx);
+
+                // Draw Character Box
+                var cellRect = new RectangleF(x, rowY + pinyinHeightPx, cellSizePx, cellSizePx);
+                RenderCell(g, page, cellRect);
+            }
+
+            // Draw translation/meaning lines to the right of the grids
+            float linesStartX = startX + totalGridW + (10 * scale);
+            float linesW = cw - totalGridW - (10 * scale);
+
+            float line1Y = rowY + pinyinHeightPx + (cellSizePx * 0.33f);
+            float line2Y = rowY + pinyinHeightPx + (cellSizePx * 0.66f);
+
+            g.DrawLine(linePen, linesStartX, line1Y, linesStartX + linesW, line1Y);
+            g.DrawLine(linePen, linesStartX, line2Y, linesStartX + linesW, line2Y);
+        }
+    }
+
+    private static void RenderCustomPage(Graphics g, PageSettings page, float px, float py, float pw, float ph, float scale)
+    {
+        // Draw page decorative borders
         float inset = 15 * scale;
         var borderRect = new RectangleF(px + inset, py + inset, pw - 2 * inset, ph - 2 * inset);
         using (var borderPen = new Pen(page.Style.BorderColor, 2f))
@@ -220,69 +292,228 @@ public static class GridRenderer
         using (var innerPen = new Pen(page.Style.BorderColor, 0.5f))
             g.DrawRectangle(innerPen, innerRect.X, innerRect.Y, innerRect.Width, innerRect.Height);
 
-        float titleFontSize = Math.Max(12, page.TitleFontSizePt * scale * 0.35f);
-        using (var titleFont = new Font("Microsoft YaHei", titleFontSize, FontStyle.Bold))
-        using (var titleBrush = new SolidBrush(page.Style.BorderColor))
+        // Content bounds (respecting page margins or inner border inset)
+        float leftMargin = Math.Max(page.MarginLeftMm * scale, inset + 10 * scale);
+        float rightMargin = Math.Max(page.MarginRightMm * scale, inset + 10 * scale);
+        float topMargin = Math.Max(page.MarginTopMm * scale, inset + 10 * scale);
+        float bottomMargin = Math.Max(page.MarginBottomMm * scale, inset + 10 * scale);
+
+        float contentX = px + leftMargin;
+        float contentW = pw - leftMargin - rightMargin;
+        float contentH = ph - topMargin - bottomMargin;
+
+        if (contentW <= 0 || contentH <= 0) return;
+
+        var images = page.Elements.OfType<CustomImageElement>().ToList();
+        var texts = page.Elements.OfType<CustomTextElement>().ToList();
+
+        // Measure total height of all elements to center content vertically on the page
+        float totalContentH = 0f;
+
+        // Image measurement
+        var mainImage = images.FirstOrDefault();
+        Bitmap? loadedImg = null;
+        float imgDrawW = 0f, imgDrawH = 0f;
+        if (mainImage != null && !string.IsNullOrEmpty(mainImage.Base64Image))
         {
-            var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            g.DrawString(page.Title, titleFont, titleBrush, px + pw / 2, py + ph * 0.35f, fmt);
+            try
+            {
+                byte[] imageBytes = Convert.FromBase64String(mainImage.Base64Image);
+                using var ms = new MemoryStream(imageBytes);
+                using var tempImg = Image.FromStream(ms);
+                loadedImg = new Bitmap(tempImg);
+
+                float maxImgSize = 60 * scale;
+                float imgAspect = (float)loadedImg.Width / loadedImg.Height;
+                if (imgAspect >= 1)
+                {
+                    imgDrawW = Math.Min(contentW, maxImgSize);
+                    imgDrawH = imgDrawW / imgAspect;
+                }
+                else
+                {
+                    imgDrawH = Math.Min(contentH * 0.4f, maxImgSize);
+                    imgDrawW = imgDrawH * imgAspect;
+                }
+                totalContentH += imgDrawH + 15 * scale;
+            }
+            catch
+            {
+                loadedImg?.Dispose();
+                loadedImg = null;
+            }
         }
 
-        if (!string.IsNullOrEmpty(page.Subtitle))
+        Font? titleFont = null;
+        Font? subFont = null;
+        Font? authorFont = null;
+        Font? notesFont = null;
+        var textFonts = new List<(CustomTextElement element, Font font, SizeF size)>();
+
+        try
         {
-            float subFontSize = Math.Max(8, page.SubtitleFontSizePt * scale * 0.35f);
-            using var subFont = new Font("Segoe UI", subFontSize, FontStyle.Italic);
-            using var subBrush = new SolidBrush(Color.FromArgb(150, page.Style.BorderColor));
-            var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            g.DrawString(page.Subtitle, subFont, subBrush, px + pw / 2, py + ph * 0.45f, fmt);
+            // Title measurement
+            SizeF titleSize = SizeF.Empty;
+            if (!string.IsNullOrWhiteSpace(page.Title))
+            {
+                float fSize = Math.Max(8, page.TitleFontSizePt * scale * 0.35f);
+                titleFont = new Font("Microsoft YaHei", fSize, FontStyle.Bold);
+                titleSize = g.MeasureString(page.Title, titleFont, (int)contentW);
+                totalContentH += titleSize.Height + 10 * scale;
+            }
+
+            // Subtitle measurement
+            SizeF subSize = SizeF.Empty;
+            if (!string.IsNullOrWhiteSpace(page.Subtitle))
+            {
+                float fSize = Math.Max(6, page.SubtitleFontSizePt * scale * 0.35f);
+                subFont = new Font("Segoe UI", fSize, FontStyle.Italic);
+                subSize = g.MeasureString(page.Subtitle, subFont, (int)contentW);
+                totalContentH += subSize.Height + 15 * scale;
+            }
+
+            // Custom text blocks measurement
+            foreach (var txt in texts)
+            {
+                if (string.IsNullOrWhiteSpace(txt.Text)) continue;
+                float fSize = Math.Max(6, txt.FontSizePt * scale * 0.35f);
+                FontStyle style = FontStyle.Regular;
+                if (txt.IsBold) style |= FontStyle.Bold;
+                if (txt.IsItalic) style |= FontStyle.Italic;
+
+                var font = new Font(txt.FontFamily, fSize, style);
+                var size = g.MeasureString(txt.Text, font, (int)contentW);
+                textFonts.Add((txt, font, size));
+
+                totalContentH += (txt.Y_Mm * scale) + size.Height + 5 * scale;
+            }
+
+            // Divider line measurement
+            bool showDivider = !string.IsNullOrWhiteSpace(page.AuthorName) || !string.IsNullOrWhiteSpace(page.Notes);
+            if (showDivider)
+            {
+                totalContentH += 25 * scale;
+            }
+
+            // Author measurement
+            SizeF authorSize = SizeF.Empty;
+            string authorStr = !string.IsNullOrWhiteSpace(page.AuthorName) ? $"姓名: {page.AuthorName}" : "";
+            if (!string.IsNullOrEmpty(authorStr))
+            {
+                float fSize = Math.Max(6, page.AuthorFontSizePt * scale * 0.35f);
+                authorFont = new Font("Microsoft YaHei", fSize, FontStyle.Regular);
+                authorSize = g.MeasureString(authorStr, authorFont, (int)contentW);
+                totalContentH += authorSize.Height + 10 * scale;
+            }
+
+            // Notes measurement
+            SizeF notesSize = SizeF.Empty;
+            if (!string.IsNullOrWhiteSpace(page.Notes))
+            {
+                float fSize = Math.Max(6, page.NotesFontSizePt * scale * 0.35f);
+                notesFont = new Font("Segoe UI", fSize, FontStyle.Regular);
+                notesSize = g.MeasureString(page.Notes, notesFont, (int)contentW);
+                totalContentH += notesSize.Height + 10 * scale;
+            }
+
+            // Determine start Y (center vertically if total content fits in available content area)
+            float startY = py + topMargin;
+            if (totalContentH < contentH)
+            {
+                startY += (contentH - totalContentH) / 2f;
+            }
+
+            float currentY = startY;
+
+            // Render Cover Image
+            if (loadedImg != null)
+            {
+                g.DrawImage(loadedImg, px + pw / 2 - imgDrawW / 2, currentY, imgDrawW, imgDrawH);
+                currentY += imgDrawH + 15 * scale;
+            }
+
+            // Render Title
+            if (titleFont != null)
+            {
+                using var brush = new SolidBrush(page.Style.BorderColor);
+                using var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
+                var rect = new RectangleF(contentX, currentY, contentW, titleSize.Height + 5 * scale);
+                g.DrawString(page.Title, titleFont, brush, rect, fmt);
+                currentY += titleSize.Height + 10 * scale;
+            }
+
+            // Render Subtitle
+            if (subFont != null)
+            {
+                using var brush = new SolidBrush(page.Style.BorderColor);
+                using var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
+                var rect = new RectangleF(contentX, currentY, contentW, subSize.Height + 5 * scale);
+                g.DrawString(page.Subtitle, subFont, brush, rect, fmt);
+                currentY += subSize.Height + 15 * scale;
+            }
+
+            // Render Custom Text Elements
+            foreach (var (txt, font, size) in textFonts)
+            {
+                currentY += txt.Y_Mm * scale;
+
+                using var brush = new SolidBrush(txt.Color);
+                using var fmt = new StringFormat
+                {
+                    LineAlignment = StringAlignment.Near,
+                    Alignment = txt.Alignment switch
+                    {
+                        StringAlignment.Near => StringAlignment.Near,
+                        StringAlignment.Far => StringAlignment.Far,
+                        _ => StringAlignment.Center
+                    }
+                };
+
+                var rect = new RectangleF(contentX, currentY, contentW, size.Height + 5 * scale);
+                g.DrawString(txt.Text, font, brush, rect, fmt);
+                currentY += size.Height + 5 * scale;
+            }
+
+            // Render Divider Line
+            if (showDivider)
+            {
+                float lineW = Math.Min(contentW * 0.6f, 100 * scale);
+                using var guidePen = new Pen(page.Style.GuideColor, 1f);
+                g.DrawLine(guidePen, px + pw / 2 - lineW / 2, currentY + 10 * scale, px + pw / 2 + lineW / 2, currentY + 10 * scale);
+                currentY += 25 * scale;
+            }
+
+            // Render Author
+            if (authorFont != null)
+            {
+                using var brush = new SolidBrush(page.Style.BorderColor);
+                using var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
+                var rect = new RectangleF(contentX, currentY, contentW, authorSize.Height + 5 * scale);
+                g.DrawString(authorStr, authorFont, brush, rect, fmt);
+                currentY += authorSize.Height + 10 * scale;
+            }
+
+            // Render Notes
+            if (notesFont != null)
+            {
+                using var brush = new SolidBrush(page.Style.BorderColor);
+                using var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
+                var rect = new RectangleF(contentX, currentY, contentW, notesSize.Height + 5 * scale);
+                g.DrawString(page.Notes, notesFont, brush, rect, fmt);
+                currentY += notesSize.Height + 10 * scale;
+            }
         }
-
-        float divY = py + ph * 0.55f;
-        float divW = pw * 0.3f;
-        using (var divPen = new Pen(page.Style.GuideColor, 1f))
-            g.DrawLine(divPen, px + pw / 2 - divW / 2, divY, px + pw / 2 + divW / 2, divY);
-
-        if (!string.IsNullOrEmpty(page.AuthorName))
+        finally
         {
-            float nameFontSize = Math.Max(8, page.AuthorFontSizePt * scale * 0.35f);
-            using var nameFont = new Font("Segoe UI", nameFontSize);
-            using var nameBrush = new SolidBrush(Color.FromArgb(100, page.Style.BorderColor));
-            var fmt = new StringFormat { Alignment = StringAlignment.Center };
-            g.DrawString($"姓名: {page.AuthorName}", nameFont, nameBrush, px + pw / 2, py + ph * 0.65f, fmt);
-        }
-
-        if (!string.IsNullOrEmpty(page.Notes))
-        {
-            float notesFontSize = Math.Max(7, page.NotesFontSizePt * scale * 0.35f);
-            using var notesFont = new Font("Segoe UI", notesFontSize);
-            using var notesBrush = new SolidBrush(Color.FromArgb(80, page.Style.BorderColor));
-            var fmt = new StringFormat { Alignment = StringAlignment.Center };
-            g.DrawString(page.Notes, notesFont, notesBrush, px + pw / 2, py + ph * 0.75f, fmt);
-        }
-    }
-
-    private static void RenderEndingPage(Graphics g, PageSettings page, float px, float py, float pw, float ph, float scale)
-    {
-        float inset = 20 * scale;
-        var borderRect = new RectangleF(px + inset, py + inset, pw - 2 * inset, ph - 2 * inset);
-        using (var borderPen = new Pen(page.Style.BorderColor, 1.5f))
-            g.DrawRectangle(borderPen, borderRect.X, borderRect.Y, borderRect.Width, borderRect.Height);
-
-        float titleFontSize = Math.Max(12, page.TitleFontSizePt * scale * 0.35f);
-        using (var titleFont = new Font("Microsoft YaHei", titleFontSize, FontStyle.Bold))
-        using (var titleBrush = new SolidBrush(page.Style.BorderColor))
-        {
-            var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            g.DrawString(page.Title, titleFont, titleBrush, px + pw / 2, py + ph * 0.4f, fmt);
-        }
-
-        if (!string.IsNullOrEmpty(page.Notes))
-        {
-            float notesFontSize = Math.Max(8, page.NotesFontSizePt * scale * 0.35f);
-            using var notesFont = new Font("Segoe UI", notesFontSize);
-            using var notesBrush = new SolidBrush(Color.FromArgb(120, page.Style.BorderColor));
-            var fmt = new StringFormat { Alignment = StringAlignment.Center };
-            g.DrawString(page.Notes, notesFont, notesBrush, px + pw / 2, py + ph * 0.55f, fmt);
+            loadedImg?.Dispose();
+            titleFont?.Dispose();
+            subFont?.Dispose();
+            authorFont?.Dispose();
+            notesFont?.Dispose();
+            foreach (var (_, font, _) in textFonts)
+            {
+                font.Dispose();
+            }
         }
     }
 
